@@ -2,7 +2,6 @@ from typing import List
 from uuid import UUID
 from fastapi import APIRouter, HTTPException, Depends
 from src.models.users import User, UserService, get_user_service
-from src.api.users import router as users_router
 
 
 router = APIRouter()

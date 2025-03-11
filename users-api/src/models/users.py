@@ -45,3 +45,6 @@ class UserService:
                 return True
         return False
 
+# Dependency injection for the singleton
+def get_user_service() -> UserService:
+    return UserService()
