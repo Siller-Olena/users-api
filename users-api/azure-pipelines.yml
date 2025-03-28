@@ -1,0 +1,88 @@
+trigger:
+  branches:
+    include:
+      - main
+      - feature/*
+
+resources:
+  repositories:
+    - repository: users-api
+      type: git
+      name: olenasiller/users-api  
+      ref: /main     
+      trigger:
+        branches:
+          include:
+            - main            
+            - feature/*       
+
+stages:
+  - stage: PreBuild
+    displayName: 'Pre-Build'
+    jobs:
+      - job: PreBuildAnalysis
+        displayName: 'Pre-Build Analysis'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - script: echo "Hello, from Pre-Build Job"
+            displayName: 'Pre-Build Job'
+
+          - script: |
+              echo "Agent.TempDirectory: $(Agent.TempDirectory)"
+              echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
+              echo "Build.Repository.LocalPath: $(Build.Repository.LocalPath)"
+              echo "Build.Repository.Name: $(Build.Repository.Name)"
+              echo "Build.SourceBranch: $(Build.SourceBranch)"
+              echo "Build.SourceBranchName: $(Build.SourceBranchName)"
+              echo "Build.SourcesDirectory: $(Build.SourcesDirectory)"
+              echo "Build.StagingDirectory: $(Build.StagingDirectory)"
+            displayName: 'Print Azure DevOps Pipeline predefined variables'
+
+  - stage: BuildAndTest
+    displayName: 'Project: Build and Test'
+    dependsOn: PreBuild
+    jobs:
+      - job: BuildAndTest
+        displayName: 'Build and Test'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - script: echo "Hello, from Build and Test Job"
+            displayName: 'Build and Test Job'
+
+  - stage: DockerBuildAndPush
+    displayName: 'Docker: Build and Push'
+    dependsOn: BuildAndTest
+    jobs:
+      - job: BuildAndPush
+        displayName: 'Build and Push Docker Image'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - script: echo "Hello, from Docker Build and Push Job"
+            displayName: 'Docker Build and Push Job'
+
+  - stage: HelmChartPackAndPush
+    displayName: 'Helm Chart: Pack and Push'
+    dependsOn: DockerBuildAndPush
+    jobs:
+      - job: PackAndPush
+        displayName: 'Helm Chart Pack and Push'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - script: echo "Hello, from Helm Chart Pack and Push Job"
+            displayName: 'Helm Chart Pack and Push Job'
+
+  - stage: PostBuild
+    displayName: 'Post-Build'
+    dependsOn: HelmChartPackAndPush
+    jobs:
+      - job: PostBuild
+        displayName: 'Post-Build'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - script: echo "Hello, from Post-Build Job"
+            displayName: 'Post-Build Job'
