@@ -24,6 +24,7 @@ stages:
         displayName: 'Pre-Build Analysis'
         pool:
           vmImage: 'ubuntu-latest'
+        
         steps:
           - script: echo "Hello, from Pre-Build Job"
             displayName: 'Pre-Build Job'
