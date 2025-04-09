@@ -5,10 +5,64 @@
 
 trigger:
 - main
+- feature/*
+
+resources:
+  repositories:
+     -repository: ci-common-templates
+     type: git
+     ref:'refs/heads/main'
+     name: ci-templates
 
 pool:
   vmImage: ubuntu-latest
 
+stages:
+- stage: StageID_PreBuild
+  displayName: Pre-Build
+  jobs: 
+  - job: JobID_PreBuild
+    displayName: 'Pre-Build'
+    steps:
+    - checkout: 'self'
+    fetchDepth: 0
+    persistCredentials: true
+
+    -checkout: 'ci-common-templates'
+    fetchDepth: 0
+    persistCredentials: true
+
+    -script:
+    #use shared functionality
+    source "$(Build.SourcesDirectory)/ci-templates/common-scripts/logging.sh"
+    info_msg "Info message"
+    warning_msg "Warning message"
+    error_msg "Error message"
+
+    displayName: 'Pre-Build'
+
+-stage: StageID_BuildAndTestProject
+ displayName: 'Project: Build and Test'  
+ dependsOn: StageID_PreBuild
+ jobs:
+ - job: JobID_BuildAndTest
+   displayName: Build and Test
+   steps:
+   - script:
+        echo "Build and Test"
+     displayName: 'Build and Test'  
+
+-stage: StageID_BuildAndPushDockerImage
+dependsOn: StageID_BuildAndTestProject
+condition: eq(variables ['Build.SourceBranchName'], 'main')
+displayName: 'Docker: Build and Push'
+job:
+- job: JobID_BuildAndPushDockerImage
+displayName:Build and Push
+steps:
+- script:
+     echo "Build and Push"
+  displayName: 'Build and Push'  
 strategy:
   matrix:
     Python38:
@@ -35,3 +89,13 @@ steps:
     pip install pytest 
     pytest pytest-azurepipelines.py
   displayName: 'pytest'
+jobs:
+- job: MyJob
+  displayName: My First Job
+  continueOnError: true
+  workspace:
+    clean: outputs
+  steps:
+  - script: echo My first job
+
+
