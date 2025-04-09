@@ -13,17 +13,17 @@ pool:
   vmImage: ubuntu-latest
 
 stages:
-# Stage 1: Pre-Build
+
+# === 1. Pre-Build ===
 - stage: PreBuild
   displayName: Pre-Build
-  condition: always()
   jobs:
   - job: PreBuildAnalysis
     displayName: Pre-Build Analysis
     steps:
     - script: |
-        echo "Hello from Pre-Build Job"
-        echo "Pipeline Variables:"
+        echo "Hello, from Pre-Build Job"
+        echo "Print predefined variables:"
         echo "Agent.TempDirectory: $(Agent.TempDirectory)"
         echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
         echo "Build.Repository.LocalPath: $(Build.Repository.LocalPath)"
@@ -32,9 +32,9 @@ stages:
         echo "Build.SourceBranchName: $(Build.SourceBranchName)"
         echo "Build.SourcesDirectory: $(Build.SourcesDirectory)"
         echo "Build.StagingDirectory: $(Build.StagingDirectory)"
-      displayName: Print Azure DevOps Pipeline predefined variables
+      displayName: 'Print Azure DevOps Predefined Variables'
 
-# Stage 2: Build and Test
+# === 2. Build and Test ===
 - stage: BuildAndTest
   displayName: Project: Build and Test
   dependsOn: PreBuild
@@ -45,58 +45,53 @@ stages:
     steps:
     - script: |
         echo "Running Build and Test steps..."
-        # Example for Python project (заміни під свій стек)
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pytest
       displayName: Run tests
 
-# Stage 3: Docker Build and Push (тільки для main)
-- stage: DockerBuildPush
+# === 3. Docker Build and Push (only for main) ===
+- stage: DockerBuildAndPush
   displayName: Docker: Build and Push
   dependsOn: BuildAndTest
-  condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'main'))
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
   jobs:
   - job: BuildAndPush
-    displayName: Build and Push Docker Image
+    displayName: Build and Push
     steps:
     - script: |
-        echo "Building Docker image..."
-        docker build -t my-image .
-        echo "Tagging Docker image..."
-        docker tag my-image myregistry.azurecr.io/my-image:latest
-        echo "Pushing Docker image..."
-        docker push myregistry.azurecr.io/my-image:latest
-      displayName: Build and Push Docker
+        echo "Docker Build and Push step..."
+        # Тут буде твій docker build, tag і push (наприклад)
+        echo "docker build -t my-image ."
+        echo "docker push my-image"
+      displayName: 'Build and Push Docker Image'
 
-# Stage 4: Helm Pack and Push (тільки для main)
-- stage: HelmChartPackPush
+# === 4. Helm Chart Pack and Push (only for main) ===
+- stage: HelmChartPack
   displayName: Helm Chart: Pack and Push
-  dependsOn: DockerBuildPush
-  condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'main'))
+  dependsOn: DockerBuildAndPush
+  condition: succeeded()
   jobs:
   - job: PackAndPush
-    displayName: Pack and Push Helm Chart
+    displayName: Pack and Push
     steps:
     - script: |
-        echo "Packing Helm Chart..."
-        helm package ./helm-chart
-        echo "Pushing Helm Chart..."
-        helm push ./helm-chart-*.tgz oci://myregistry.azurecr.io/helm
-      displayName: Pack and Push Helm Chart
+        echo "Packing and pushing Helm chart..."
+        # helm package ./chart && helm push ...
+      displayName: 'Pack and Push Helm Chart'
 
-# Stage 5: Post-Build
+# === 5. Post-Build ===
 - stage: PostBuild
   displayName: Post-Build
-  dependsOn: HelmChartPackPush
-  condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'main'))
+  dependsOn: HelmChartPack
+  condition: succeeded()
   jobs:
   - job: PostBuild
-    displayName: Post-Build Actions
+    displayName: Post-Build
     steps:
     - script: |
-        echo "Post-build cleanup or notifications"
-      displayName: Final step
+        echo "Hello from Post-Build Job"
+      displayName: 'Post-Build Cleanup'
 
 
 
