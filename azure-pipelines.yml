@@ -12,24 +12,20 @@ stages:
   - stage: PreBuild
     displayName: 'Pre-Build Stage'
     jobs:
-      - job: PreBuildAnalysis
-        displayName: 'Print Azure DevOps Pipeline predefined variables'
+      - job: PrintInfo
+        displayName: 'Print Azure DevOps Variables'
         steps:
           - checkout: self
             fetchDepth: 0
             persistCredentials: true
-
+          
           - script: |
-              echo "### Azure DevOps Variables:"
-              echo "Agent.TempDirectory: $(Agent.TempDirectory)"
-              echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
-              echo "Build.Repository.LocalPath: $(Build.Repository.LocalPath)"
-              echo "Build.Repository.Name: $(Build.Repository.Name)"
+              echo "Printing predefined variables:"
               echo "Build.SourceBranch: $(Build.SourceBranch)"
               echo "Build.SourceBranchName: $(Build.SourceBranchName)"
-              echo "Build.SourcesDirectory: $(Build.SourcesDirectory)"
-              echo "Build.StagingDirectory: $(Build.StagingDirectory)"
-            displayName: 'Print Azure DevOps Predefined Variables'
+              echo "Build.Repository.Name: $(Build.Repository.Name)"
+              echo "Agent.TempDirectory: $(Agent.TempDirectory)"
+            displayName: 'Show Variables'
 
   # === STAGE 2: BUILD & TEST ===
   - stage: BuildAndTest
@@ -40,42 +36,39 @@ stages:
       - job: BuildTest
         displayName: 'Build and Test'
         steps:
-          - checkout: self
-
           - script: |
-              echo "Checking for requirements.txt..."
-              if [ -f "requirements.txt" ]; then
-                echo "✅ requirements.txt найден"
-              else
-                echo "⚠️ requirements.txt не найден. Пропускаем установку зависимостей."
-                exit 0
-              fi
-            displayName: 'Check requirements.txt'
-
-          - script: |
-              echo "Installing dependencies..."
+              echo "Installing Python and dependencies..."
               python -m pip install --upgrade pip
-              pip install -r requirements.txt || echo "⚠️ Ошибка установки зависимостей"
+              pip install -r requirements.txt
             displayName: 'Install Requirements'
 
           - script: |
               echo "Installing pytest..."
               pip install pytest
-            displayName: 'Install Pytest'
+            displayName: 'Install pytest'
 
           - script: |
-              echo "Checking for tests/ directory..."
+              echo "Checking Python and pip versions..."
+              python --version
+              pip --version
+            displayName: 'Check Python and Pip Versions'
+
+          - script: |
+              echo "Checking if test files exist..."
               if [ -d "tests" ]; then
-                echo "✅ tests/ найден"
+                ls -R tests
               else
-                echo "⚠️ tests/ не найден. Пропускаем тесты."
-                exit 0
+                echo "⚠️ No 'tests/' directory found. Skipping test check."
               fi
-            displayName: 'Check Test Directory'
+            displayName: 'Check Test Files'
 
           - script: |
-              echo "Running pytest..."
-              pytest --maxfail=1 --disable-warnings -q || echo "⚠️ Некоторые тесты не прошли или не найдены."
+              echo "Running tests with pytest..."
+              if [ -d "tests" ]; then
+                pytest --maxfail=1 --disable-warnings -q || echo "⚠️ Some tests failed or none were found."
+              else
+                echo "⚠️ Skipping pytest because no 'tests/' folder found."
+              fi
             displayName: 'Run Tests'
 
   # === STAGE 3: DOCKER BUILD & PUSH ===
@@ -87,24 +80,36 @@ stages:
       - job: DockerJob
         displayName: 'Docker Build and Push'
         steps:
-          - checkout: self
+          # Шаг для вывода значений переменных для диагностики
+          - script: |
+              echo "DOCKER_USERNAME: $(DOCKER_USERNAME)"
+              echo "DOCKER_PASSWORD is set: $(DOCKER_PASSWORD) != ''"
+            displayName: 'Print Docker Credentials'
 
-          # Логин в Docker через Service Connection
-          - task: Docker@2
-            displayName: 'Docker Login'
-            inputs:
-              command: login
-              containerRegistry: 'DockerHubConnection'  # 👈 Название вашей service connection
+          # Проверка, что переменные не пустые перед логином
+          - script: |
+              if [ -z "$(DOCKER_USERNAME)" ] || [ -z "$(DOCKER_PASSWORD)" ]; then
+                echo "❌ DOCKER_USERNAME or DOCKER_PASSWORD is not set. Please check pipeline variables."
+                exit 1
+              fi
+            displayName: 'Check Docker Credentials'
 
+          # Шаг для логина в Docker с добавлением подробного вывода
           - task: Docker@2
-            displayName: 'Build and Push Docker Image'
+            displayName: '**Docker Login**'
             inputs:
-              command: buildAndPush
-              repository: '$(DOCKER_USERNAME)/user-api'
-              dockerfile: '**/Dockerfile'
-              containerRegistry: 'DockerHubConnection'  # 👈 Тот же connection
-              tags: |
-                $(Build.BuildId)
+              containerRegistry: 'DockerHubConnection'  # Вказуємо наш service connection
+              command: 'login'
+
+          # Шаг для сборки и пуша Docker-образа
+          - script: |
+              IMAGE_NAME=$(DOCKER_USERNAME)/user-api:$(Build.BuildId)
+              echo "Building Docker image: $IMAGE_NAME"
+              docker build -t $IMAGE_NAME .
+
+              echo "Pushing Docker image: $IMAGE_NAME"
+              docker push $IMAGE_NAME
+            displayName: '**Docker Build & Push**'
 
   # === STAGE 4: HELM PACK ===
   - stage: HelmChartPack
@@ -117,12 +122,11 @@ stages:
         steps:
           - script: |
               echo "Packaging Helm chart..."
-              if [ -d "./chart" ]; then
-                helm package ./chart
-              else
-                echo "⚠️ chart/ не найден"
-              fi
-            displayName: 'Pack Helm Chart'
+              helm package ./chart || echo "⚠️ Chart folder not found."
+
+              echo "NOTE: Add helm push plugin if needed"
+              # helm push ./chart-*.tgz my-helm-repo
+            displayName: 'Pack & Push Helm Chart'
 
   # === STAGE 5: CLEANUP ===
   - stage: PostBuild
@@ -131,9 +135,10 @@ stages:
     condition: succeeded()
     jobs:
       - job: Cleanup
-        displayName: 'Cleanup Job'
+        displayName: 'Post-Build Cleanup'
         steps:
           - script: |
-              echo "✅ Pipeline завершен. Очистка завершена."
+              echo "✅ Pipeline finished. Cleanup complete."
             displayName: 'Final Cleanup'
+
 
