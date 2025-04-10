@@ -97,7 +97,7 @@ stages:
           # Шаг для логина в Docker с добавлением подробного вывода
           - script: |
               echo "Logging in to Docker Hub..."
-              echo "$(DOCKER_PASSWORD)" | docker login -u "$(DOCKER_USERNAME)" --password-stdin || { echo " Docker login failed"; exit 1; }
+              echo "$(DOCKER_PASSWORD)" | docker login -u "$(DOCKER_USERNAME)" --password-stdin
             displayName: '**Docker Login**'
 
           # Шаг для сборки и пуша Docker-образа
