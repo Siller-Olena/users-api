@@ -1,8 +1,3 @@
-# Python package
-# Create and test a Python package on multiple Python versions.
-# Add steps that analyze code, save the dist with the build record, publish to a PyPI-compatible index, and more:
-# https://docs.microsoft.com/azure/devops/pipelines/languages/python
-
 trigger:
   branches:
     include:
@@ -14,84 +9,95 @@ pool:
 
 stages:
 
-# === 1. Pre-Build ===
+
 - stage: PreBuild
-  displayName: Pre-Build
+  displayName: 'Pre-Build Stage'
   jobs:
-  - job: PreBuildAnalysis
-    displayName: Pre-Build Analysis
+  - job: PrintInfo
+    displayName: 'Print Azure DevOps Variables'
     steps:
     - script: |
-        echo "Hello, from Pre-Build Job"
-        echo "Print predefined variables:"
-        echo "Agent.TempDirectory: $(Agent.TempDirectory)"
-        echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
-        echo "Build.Repository.LocalPath: $(Build.Repository.LocalPath)"
-        echo "Build.Repository.Name: $(Build.Repository.Name)"
+        echo "Printing predefined variables:"
         echo "Build.SourceBranch: $(Build.SourceBranch)"
         echo "Build.SourceBranchName: $(Build.SourceBranchName)"
-        echo "Build.SourcesDirectory: $(Build.SourcesDirectory)"
-        echo "Build.StagingDirectory: $(Build.StagingDirectory)"
-      displayName: 'Print Azure DevOps Predefined Variables'
+        echo "Build.Repository.Name: $(Build.Repository.Name)"
+        echo "Agent.TempDirectory: $(Agent.TempDirectory)"
+      displayName: 'Show Variables'
 
-# === 2. Build and Test ===
+
 - stage: BuildAndTest
-  displayName: Project: Build and Test
+  displayName: 'Project: Build and Test'
   dependsOn: PreBuild
   condition: succeeded()
   jobs:
-  - job: BuildAndTest
-    displayName: Build and Test
+  - job: BuildTest
+    displayName: 'Build and Test'
     steps:
     - script: |
-        echo "Running Build and Test steps..."
+        echo "Installing Python dependencies..."
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pytest
-      displayName: Run tests
+      displayName: 'Install Requirements'
 
-# === 3. Docker Build and Push (only for main) ===
-- stage: DockerBuildAndPush
-  displayName: Docker: Build and Push
-  dependsOn: BuildAndTest
-  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
-  jobs:
-  - job: BuildAndPush
-    displayName: Build and Push
-    steps:
     - script: |
-        echo "Docker Build and Push step..."
-        # Тут буде твій docker build, tag і push (наприклад)
-        echo "docker build -t my-image ."
-        echo "docker push my-image"
-      displayName: 'Build and Push Docker Image'
+        echo "Running tests with pytest..."
+        pytest
+      displayName: 'Run Tests'
 
-# === 4. Helm Chart Pack and Push (only for main) ===
+
+- stage: DockerBuildAndPush
+  displayName: 'Docker: Build and Push'
+  dependsOn: BuildAndTest
+  condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'main'))
+  jobs:
+  - job: DockerJob
+    displayName: 'Docker Build and Push'
+    steps:
+
+    - script: |
+        echo "Logging in to Docker Hub..."
+        echo "$(DOCKER_PASSWORD)" | docker login -u "$(DOCKER_USERNAME)" --password-stdin
+      displayName: '**Docker Login**'
+
+    - script: |
+        IMAGE_NAME=$(DOCKER_USERNAME)/sillerolena:$(Build.BuildId)
+        echo "Building Docker image: $IMAGE_NAME"
+        docker build -t $IMAGE_NAME.
+
+        echo "Pushing Docker $IMAGE_NAME"
+        docker push $IMAGE_NAME
+      displayName: '**Docker Build & Push**'
+
+
 - stage: HelmChartPack
-  displayName: Helm Chart: Pack and Push
+  displayName: 'Helm Chart: Pack and Push'
   dependsOn: DockerBuildAndPush
   condition: succeeded()
   jobs:
-  - job: PackAndPush
-    displayName: Pack and Push
+  - job: HelmJob
+    displayName: 'Pack and Push Helm Chart'
     steps:
     - script: |
-        echo "Packing and pushing Helm chart..."
-        # helm package ./chart && helm push ...
-      displayName: 'Pack and Push Helm Chart'
+        echo "Packaging Helm chart..."
+        helm package ./chart
 
-# === 5. Post-Build ===
+        echo "Pushing Helm chart to repository..."
+        # Make sure 'helm push' plugin is installed
+        # helm push ./chart-*.tgz my-helm-repo
+      displayName: 'Pack & Push Helm Chart'
+
+
 - stage: PostBuild
-  displayName: Post-Build
+  displayName: 'Post-Build Stage'
   dependsOn: HelmChartPack
   condition: succeeded()
   jobs:
-  - job: PostBuild
-    displayName: Post-Build
+  - job: Cleanup
+    displayName: 'Post-Build Cleanup'
     steps:
     - script: |
-        echo "Hello from Post-Build Job"
-      displayName: 'Post-Build Cleanup'
+        echo "Cleanup steps or final notifications..."
+      displayName: 'Final Cleanup'
 
 
 
