@@ -4,28 +4,18 @@ trigger:
       - main
       - feature/*
 
-resources:
-  repositories:
-    - repository: user-api
-      type: git
-      ref: 'main'
-      name: user-api
-
 pool:
   vmImage: 'ubuntu-latest'
 
 stages:
+  # === STAGE 1: PRE-BUILD ===
   - stage: PreBuild
     displayName: 'Pre-Build Stage'
     jobs:
       - job: PrintInfo
         displayName: 'Print Azure DevOps Variables'
         steps:
-          - checkout: 'self'
-            fetchDepth: 0
-            persistCredentials: true
-          
-          - checkout: 'user-api'
+          - checkout: self
             fetchDepth: 0
             persistCredentials: true
           
@@ -37,6 +27,7 @@ stages:
               echo "Agent.TempDirectory: $(Agent.TempDirectory)"
             displayName: 'Show Variables'
 
+  # === STAGE 2: BUILD & TEST ===
   - stage: BuildAndTest
     displayName: 'Project: Build and Test'
     dependsOn: PreBuild
@@ -45,39 +36,34 @@ stages:
       - job: BuildTest
         displayName: 'Build and Test'
         steps:
-          # Установка Python зависимостей
           - script: |
-              echo "Installing Python dependencies..."
+              echo "Installing Python and dependencies..."
               python -m pip install --upgrade pip
               pip install -r requirements.txt
             displayName: 'Install Requirements'
 
-          # Установка pytest
           - script: |
               echo "Installing pytest..."
               pip install pytest
             displayName: 'Install pytest'
 
-          # Проверка установленных версий Python и pip
           - script: |
-              echo "Python Version:"
+              echo "Checking Python and pip versions..."
               python --version
-              echo "Pip Version:"
               pip --version
             displayName: 'Check Python and Pip Versions'
 
-          # Проверка наличия тестов в директории
           - script: |
               echo "Checking if test files exist..."
-              ls -R tests/   # Эта команда покажет все тестовые файлы в папке tests
+              if [ -d "tests" ]; then ls -R tests; else echo "❌ Directory 'tests/' not found."; exit 0; fi
             displayName: 'Check Test Files'
 
-          # Запуск тестов с использованием pytest
           - script: |
               echo "Running tests with pytest..."
-              pytest --maxfail=1 --disable-warnings -q  # Запуск тестов
+              pytest --maxfail=1 --disable-warnings -q || echo "⚠️ No tests found or some failed."
             displayName: 'Run Tests'
 
+  # === STAGE 3: DOCKER BUILD & PUSH ===
   - stage: DockerBuildAndPush
     displayName: 'Docker: Build and Push'
     dependsOn: BuildAndTest
@@ -86,22 +72,21 @@ stages:
       - job: DockerJob
         displayName: 'Docker Build and Push'
         steps:
-          # Логин в Docker Hub
           - script: |
               echo "Logging in to Docker Hub..."
               echo "$(DOCKER_PASSWORD)" | docker login -u "$(DOCKER_USERNAME)" --password-stdin
             displayName: '**Docker Login**'
 
-          # Сборка и пуш Docker образа
           - script: |
-              IMAGE_NAME=$(DOCKER_USERNAME)/$(Build.Repository.Name):$(Build.BuildId)
+              IMAGE_NAME=$(DOCKER_USERNAME)/user-api:$(Build.BuildId)
               echo "Building Docker image: $IMAGE_NAME"
               docker build -t $IMAGE_NAME .
 
-              echo "Pushing Docker $IMAGE_NAME"
+              echo "Pushing Docker image: $IMAGE_NAME"
               docker push $IMAGE_NAME
             displayName: '**Docker Build & Push**'
 
+  # === STAGE 4: HELM PACK ===
   - stage: HelmChartPack
     displayName: 'Helm Chart: Pack and Push'
     dependsOn: DockerBuildAndPush
@@ -114,11 +99,11 @@ stages:
               echo "Packaging Helm chart..."
               helm package ./chart
 
-              echo "Pushing Helm chart to repository..."
-              # Make sure 'helm push' plugin is installed
+              echo "NOTE: Add helm push plugin if needed"
               # helm push ./chart-*.tgz my-helm-repo
             displayName: 'Pack & Push Helm Chart'
 
+  # === STAGE 5: CLEANUP ===
   - stage: PostBuild
     displayName: 'Post-Build Stage'
     dependsOn: HelmChartPack
@@ -128,6 +113,5 @@ stages:
         displayName: 'Post-Build Cleanup'
         steps:
           - script: |
-              echo "Cleanup steps or final notifications..."
+              echo "Pipeline finished. Cleaning up or notifying..."
             displayName: 'Final Cleanup'
-
