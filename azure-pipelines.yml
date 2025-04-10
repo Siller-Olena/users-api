@@ -27,7 +27,6 @@ stages:
               echo "Agent.TempDirectory: $(Agent.TempDirectory)"
             displayName: 'Show Variables'
             
-
   # === STAGE 2: BUILD & TEST ===
   - stage: BuildAndTest
     displayName: 'Project: Build and Test'
