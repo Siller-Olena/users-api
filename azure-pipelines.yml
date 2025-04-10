@@ -40,9 +40,15 @@ stages:
       displayName: 'Install Requirements'
 
     - script: |
+        echo "Installing pytest..."
+        pip install pytest  
+      displayName: 'Install pytest'
+
+    - script: |
         echo "Running tests with pytest..."
-        pytest
+        pytest   # Запускаем тесты
       displayName: 'Run Tests'
+
 
 
 - stage: DockerBuildAndPush
