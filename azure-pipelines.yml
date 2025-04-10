@@ -53,7 +53,7 @@ stages:
 
     - script: |
         echo "Running tests with pytest..."
-        pytest   # Запускаем тесты
+        pytest
       displayName: 'Run Tests'
 
 - stage: DockerBuildAndPush
@@ -106,3 +106,4 @@ stages:
     - script: |
         echo "Cleanup steps or final notifications..."
       displayName: 'Final Cleanup'
+
