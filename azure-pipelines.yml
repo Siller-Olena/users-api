@@ -5,7 +5,7 @@ trigger:
       - feature/*
 
 pool:
-  vmImage: ubuntu-latest
+  vmImage: ubuntu-20.04 
 
 stages:
 
@@ -33,35 +33,35 @@ stages:
     displayName: 'Build and Test'
     steps:
 
-    # Проверка, установлен ли Python, если нет - установка
     - script: |
-        echo "Checking if Python is installed..."
-        python --version || (echo "Python not found. Installing Python..."; sudo apt-get update; sudo apt-get install -y python3 python3-pip)
-      displayName: 'Check and Install Python'
+        echo "Checking Python version..."
+        python --version
+      displayName: 'Check Python Version'
 
-    # Проверка, установлен ли pip, если нет - установка
     - script: |
-        echo "Checking if pip is installed..."
-        pip --version || (echo "pip not found. Installing pip..."; sudo apt-get install -y python3-pip)
-      displayName: 'Check and Install pip'
+        echo "Checking pip version..."
+        pip --version
+      displayName: 'Check pip Version'
 
-    # Установка зависимостей
     - script: |
         echo "Installing Python dependencies..."
         python -m pip install --upgrade pip
         pip install -r requirements.txt
       displayName: 'Install Requirements'
 
-    # Установка pytest
     - script: |
         echo "Installing pytest..."
         pip install pytest
       displayName: 'Install pytest'
 
-    # Запуск тестов
+    - script: |
+        echo "Checking if there are any tests..."
+        find . -name "test_*.py" || (echo "No test files found" && exit 1)
+      displayName: 'Check for Test Files'
+
     - script: |
         echo "Running tests with pytest..."
-        pytest
+        pytest  # Запуск тестов
       displayName: 'Run Tests'
 
 
@@ -74,13 +74,11 @@ stages:
     displayName: 'Docker Build and Push'
     steps:
 
-    # Логин в Docker
     - script: |
         echo "Logging in to Docker Hub..."
         echo "$(DOCKER_PASSWORD)" | docker login -u "$(DOCKER_USERNAME)" --password-stdin
       displayName: '**Docker Login**'
 
-    # Построение и пуш Docker образа
     - script: |
         IMAGE_NAME=$(DOCKER_USERNAME)/sillerolena:$(Build.BuildId)
         echo "Building Docker image: $IMAGE_NAME"
@@ -119,6 +117,3 @@ stages:
     - script: |
         echo "Cleanup steps or final notifications..."
       displayName: 'Final Cleanup'
-
-
-
