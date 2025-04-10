@@ -26,6 +26,7 @@ stages:
               echo "Build.Repository.Name: $(Build.Repository.Name)"
               echo "Agent.TempDirectory: $(Agent.TempDirectory)"
             displayName: 'Show Variables'
+            
 
   # === STAGE 2: BUILD & TEST ===
   - stage: BuildAndTest
