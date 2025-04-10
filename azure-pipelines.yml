@@ -4,103 +4,129 @@ trigger:
       - main
       - feature/*
 
+resources:
+  repositories:
+    - repository: user-api
+      type: git
+      ref: 'main'
+      name: user-api
+
 pool:
-  vmImage: 'ubuntu-20.04'  # Изменение образа на ubuntu-20.04
+  vmImage: 'ubuntu-latest'
 
 stages:
   - stage: PreBuild
     displayName: 'Pre-Build Stage'
     jobs:
-    - job: PrintInfo
-      displayName: 'Print Azure DevOps Variables'
-      steps:
-        - script: |
-            echo "Printing predefined variables:"
-            echo "Build.SourceBranch: $(Build.SourceBranch)"
-            echo "Build.SourceBranchName: $(Build.SourceBranchName)"
-            echo "Build.Repository.Name: $(Build.Repository.Name)"
-            echo "Agent.TempDirectory: $(Agent.TempDirectory)"
-            echo "Python Version: $(python --version)"
-            echo "Pip Version: $(pip --version)"
-          displayName: 'Show Variables and Python Versions'
+      - job: PrintInfo
+        displayName: 'Print Azure DevOps Variables'
+        steps:
+          - checkout: 'self'
+            fetchDepth: 0
+            persistCredentials: true
+          
+          - checkout: 'user-api'
+            fetchDepth: 0
+            persistCredentials: true
+          
+          - script: |
+              echo "Printing predefined variables:"
+              echo "Build.SourceBranch: $(Build.SourceBranch)"
+              echo "Build.SourceBranchName: $(Build.SourceBranchName)"
+              echo "Build.Repository.Name: $(Build.Repository.Name)"
+              echo "Agent.TempDirectory: $(Agent.TempDirectory)"
+            displayName: 'Show Variables'
 
   - stage: BuildAndTest
     displayName: 'Project: Build and Test'
     dependsOn: PreBuild
     condition: succeeded()
     jobs:
-    - job: BuildTest
-      displayName: 'Build and Test'
-      steps:
-        - script: |
-            echo "Installing Python dependencies..."
-            python -m pip install --upgrade pip
-            pip install -r requirements.txt
-          displayName: 'Install Requirements'
+      - job: BuildTest
+        displayName: 'Build and Test'
+        steps:
+          # Установка Python зависимостей
+          - script: |
+              echo "Installing Python dependencies..."
+              python -m pip install --upgrade pip
+              pip install -r requirements.txt
+            displayName: 'Install Requirements'
 
-        - script: |
-            echo "Installing pytest..."
-            pip install pytest  
-          displayName: 'Install pytest'
+          # Установка pytest
+          - script: |
+              echo "Installing pytest..."
+              pip install pytest
+            displayName: 'Install pytest'
 
-        - script: |
-            echo "Checking if test files exist..."
-            ls -R tests/   # Проверка на наличие тестов
-          displayName: 'Check Test Files'
+          # Проверка установленных версий Python и pip
+          - script: |
+              echo "Python Version:"
+              python --version
+              echo "Pip Version:"
+              pip --version
+            displayName: 'Check Python and Pip Versions'
 
-        - script: |
-            echo "Running tests with pytest..."
-            pytest --maxfail=1 --disable-warnings -q   # Запуск тестов
-          displayName: 'Run Tests'
+          # Проверка наличия тестов в директории
+          - script: |
+              echo "Checking if test files exist..."
+              ls -R tests/   # Эта команда покажет все тестовые файлы в папке tests
+            displayName: 'Check Test Files'
+
+          # Запуск тестов с использованием pytest
+          - script: |
+              echo "Running tests with pytest..."
+              pytest --maxfail=1 --disable-warnings -q  # Запуск тестов
+            displayName: 'Run Tests'
 
   - stage: DockerBuildAndPush
     displayName: 'Docker: Build and Push'
     dependsOn: BuildAndTest
     condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'main'))
     jobs:
-    - job: DockerJob
-      displayName: 'Docker Build and Push'
-      steps:
-        - script: |
-            echo "Logging in to Docker Hub..."
-            echo "$(DOCKER_PASSWORD)" | docker login -u "$(DOCKER_USERNAME)" --password-stdin
-          displayName: '**Docker Login**'
+      - job: DockerJob
+        displayName: 'Docker Build and Push'
+        steps:
+          # Логин в Docker Hub
+          - script: |
+              echo "Logging in to Docker Hub..."
+              echo "$(DOCKER_PASSWORD)" | docker login -u "$(DOCKER_USERNAME)" --password-stdin
+            displayName: '**Docker Login**'
 
-        - script: |
-            IMAGE_NAME=$(DOCKER_USERNAME)/sillerolena:$(Build.BuildId)
-            echo "Building Docker image: $IMAGE_NAME"
-            docker build -t $IMAGE_NAME .
+          # Сборка и пуш Docker образа
+          - script: |
+              IMAGE_NAME=$(DOCKER_USERNAME)/$(Build.Repository.Name):$(Build.BuildId)
+              echo "Building Docker image: $IMAGE_NAME"
+              docker build -t $IMAGE_NAME .
 
-            echo "Pushing Docker $IMAGE_NAME"
-            docker push $IMAGE_NAME
-          displayName: '**Docker Build & Push**'
+              echo "Pushing Docker $IMAGE_NAME"
+              docker push $IMAGE_NAME
+            displayName: '**Docker Build & Push**'
 
   - stage: HelmChartPack
     displayName: 'Helm Chart: Pack and Push'
     dependsOn: DockerBuildAndPush
     condition: succeeded()
     jobs:
-    - job: HelmJob
-      displayName: 'Pack and Push Helm Chart'
-      steps:
-        - script: |
-            echo "Packaging Helm chart..."
-            helm package ./chart
+      - job: HelmJob
+        displayName: 'Pack and Push Helm Chart'
+        steps:
+          - script: |
+              echo "Packaging Helm chart..."
+              helm package ./chart
 
-            echo "Pushing Helm chart to repository..."
-            # Make sure 'helm push' plugin is installed
-            # helm push ./chart-*.tgz my-helm-repo
-          displayName: 'Pack & Push Helm Chart'
+              echo "Pushing Helm chart to repository..."
+              # Make sure 'helm push' plugin is installed
+              # helm push ./chart-*.tgz my-helm-repo
+            displayName: 'Pack & Push Helm Chart'
 
   - stage: PostBuild
     displayName: 'Post-Build Stage'
     dependsOn: HelmChartPack
     condition: succeeded()
     jobs:
-    - job: Cleanup
-      displayName: 'Post-Build Cleanup'
-      steps:
-        - script: |
-            echo "Cleanup steps or final notifications..."
-          displayName: 'Final Cleanup'
-
+      - job: Cleanup
+        displayName: 'Post-Build Cleanup'
+        steps:
+          - script: |
+              echo "Cleanup steps or final notifications..."
+            displayName: 'Final Cleanup'
