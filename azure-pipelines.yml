@@ -6,7 +6,7 @@ trigger:
 
 resources:
   repositories:
-    - repository: olenasiller
+    - repository: user-api
       type: git
       ref: 'main'
       name: user-api
@@ -130,3 +130,4 @@ stages:
           - script: |
               echo "Cleanup steps or final notifications..."
             displayName: 'Final Cleanup'
+
