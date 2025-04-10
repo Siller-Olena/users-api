@@ -95,11 +95,10 @@ stages:
             displayName: 'Check Docker Credentials'
 
           # Шаг для логина в Docker с добавлением подробного вывода
-          - task: Docker@2
+          - script: |
+              echo "Logging in to Docker Hub..."
+              echo "$(DOCKER_PASSWORD)" | docker login -u "$(DOCKER_USERNAME)" --password-stdin || { echo "❌ Docker login failed"; exit 1; }
             displayName: '**Docker Login**'
-            inputs:
-              containerRegistry: 'DockerHubConnection'  # Вказуємо наш service connection
-              command: 'login'
 
           # Шаг для сборки и пуша Docker-образа
           - script: |
@@ -140,5 +139,6 @@ stages:
           - script: |
               echo "✅ Pipeline finished. Cleanup complete."
             displayName: 'Final Cleanup'
+
 
 
