@@ -6,10 +6,10 @@ trigger:
 
 resources:
   repositories:
-    - repository: user-api
+    - repository: olenasiller
       type: git
       ref: 'main'
-      name: user-api
+      name: olenasiller
 
 pool:
   vmImage: 'ubuntu-latest'
