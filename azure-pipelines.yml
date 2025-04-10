@@ -80,8 +80,14 @@ stages:
       - job: DockerJob
         displayName: 'Docker Build and Push'
         steps:
+          # Шаг для вывода значений переменных для диагностики
           - script: |
-              echo "Logging in to Docker Hub..."
+              echo "DOCKER_USERNAME: $(DOCKER_USERNAME)"
+              echo "DOCKER_PASSWORD is set: $(DOCKER_PASSWORD) != ''"
+            displayName: 'Print Docker Credentials'
+
+          # Проверка, что переменные не пустые перед логином
+          - script: |
               if [ -z "$(DOCKER_USERNAME)" ] || [ -z "$(DOCKER_PASSWORD)" ]; then
                 echo "❌ DOCKER_USERNAME or DOCKER_PASSWORD is not set. Please check pipeline variables."
                 exit 1
@@ -89,6 +95,7 @@ stages:
               echo "$(DOCKER_PASSWORD)" | docker login -u "$(DOCKER_USERNAME)" --password-stdin
             displayName: '**Docker Login**'
 
+          # Шаг для сборки и пуша Docker-образа
           - script: |
               IMAGE_NAME=$(DOCKER_USERNAME)/user-api:$(Build.BuildId)
               echo "Building Docker image: $IMAGE_NAME"
@@ -127,4 +134,5 @@ stages:
           - script: |
               echo "✅ Pipeline finished. Cleanup complete."
             displayName: 'Final Cleanup'
+
 
