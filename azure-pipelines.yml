@@ -5,105 +5,102 @@ trigger:
       - feature/*
 
 pool:
-  vmImage: ubuntu-latest
+  vmImage: 'ubuntu-20.04'  # Изменение образа на ubuntu-20.04
 
 stages:
-- stage: PreBuild
-  displayName: 'Pre-Build Stage'
-  jobs:
-  - job: PrintInfo
-    displayName: 'Print Azure DevOps Variables'
-    steps:
-    - script: |
-        echo "Printing predefined variables:"
-        echo "Build.SourceBranch: $(Build.SourceBranch)"
-        echo "Build.SourceBranchName: $(Build.SourceBranchName)"
-        echo "Build.Repository.Name: $(Build.Repository.Name)"
-        echo "Agent.TempDirectory: $(Agent.TempDirectory)"
-      displayName: 'Show Variables'
+  - stage: PreBuild
+    displayName: 'Pre-Build Stage'
+    jobs:
+    - job: PrintInfo
+      displayName: 'Print Azure DevOps Variables'
+      steps:
+        - script: |
+            echo "Printing predefined variables:"
+            echo "Build.SourceBranch: $(Build.SourceBranch)"
+            echo "Build.SourceBranchName: $(Build.SourceBranchName)"
+            echo "Build.Repository.Name: $(Build.Repository.Name)"
+            echo "Agent.TempDirectory: $(Agent.TempDirectory)"
+            echo "Python Version: $(python --version)"
+            echo "Pip Version: $(pip --version)"
+          displayName: 'Show Variables and Python Versions'
 
-- stage: BuildAndTest
-  displayName: 'Project: Build and Test'
-  dependsOn: PreBuild
-  condition: succeeded()
-  jobs:
-  - job: BuildTest
-    displayName: 'Build and Test'
-    steps:
-    - script: |
-        echo "Checking Python version..."
-        python --version
-      displayName: 'Check Python Version'
+  - stage: BuildAndTest
+    displayName: 'Project: Build and Test'
+    dependsOn: PreBuild
+    condition: succeeded()
+    jobs:
+    - job: BuildTest
+      displayName: 'Build and Test'
+      steps:
+        - script: |
+            echo "Installing Python dependencies..."
+            python -m pip install --upgrade pip
+            pip install -r requirements.txt
+          displayName: 'Install Requirements'
 
-    - script: |
-        echo "Checking pip version..."
-        pip --version
-      displayName: 'Check pip Version'
+        - script: |
+            echo "Installing pytest..."
+            pip install pytest  
+          displayName: 'Install pytest'
 
-    - script: |
-        echo "Installing Python dependencies..."
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-      displayName: 'Install Requirements'
+        - script: |
+            echo "Checking if test files exist..."
+            ls -R tests/   # Проверка на наличие тестов
+          displayName: 'Check Test Files'
 
-    - script: |
-        echo "Installing pytest..."
-        pip install pytest  
-      displayName: 'Install pytest'
+        - script: |
+            echo "Running tests with pytest..."
+            pytest --maxfail=1 --disable-warnings -q   # Запуск тестов
+          displayName: 'Run Tests'
 
-    - script: |
-        echo "Running tests with pytest..."
-        pytest
-      displayName: 'Run Tests'
+  - stage: DockerBuildAndPush
+    displayName: 'Docker: Build and Push'
+    dependsOn: BuildAndTest
+    condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'main'))
+    jobs:
+    - job: DockerJob
+      displayName: 'Docker Build and Push'
+      steps:
+        - script: |
+            echo "Logging in to Docker Hub..."
+            echo "$(DOCKER_PASSWORD)" | docker login -u "$(DOCKER_USERNAME)" --password-stdin
+          displayName: '**Docker Login**'
 
-- stage: DockerBuildAndPush
-  displayName: 'Docker: Build and Push'
-  dependsOn: BuildAndTest
-  condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'main'))
-  jobs:
-  - job: DockerJob
-    displayName: 'Docker Build and Push'
-    steps:
-    - script: |
-        echo "Logging in to Docker Hub..."
-        echo "$(DOCKER_PASSWORD)" | docker login -u "$(DOCKER_USERNAME)" --password-stdin
-      displayName: '**Docker Login**'
+        - script: |
+            IMAGE_NAME=$(DOCKER_USERNAME)/sillerolena:$(Build.BuildId)
+            echo "Building Docker image: $IMAGE_NAME"
+            docker build -t $IMAGE_NAME .
 
-    - script: |
-        IMAGE_NAME=$(DOCKER_USERNAME)/sillerolena:$(Build.BuildId)
-        echo "Building Docker image: $IMAGE_NAME"
-        docker build -t $IMAGE_NAME .
+            echo "Pushing Docker $IMAGE_NAME"
+            docker push $IMAGE_NAME
+          displayName: '**Docker Build & Push**'
 
-        echo "Pushing Docker $IMAGE_NAME"
-        docker push $IMAGE_NAME
-      displayName: '**Docker Build & Push**'
+  - stage: HelmChartPack
+    displayName: 'Helm Chart: Pack and Push'
+    dependsOn: DockerBuildAndPush
+    condition: succeeded()
+    jobs:
+    - job: HelmJob
+      displayName: 'Pack and Push Helm Chart'
+      steps:
+        - script: |
+            echo "Packaging Helm chart..."
+            helm package ./chart
 
-- stage: HelmChartPack
-  displayName: 'Helm Chart: Pack and Push'
-  dependsOn: DockerBuildAndPush
-  condition: succeeded()
-  jobs:
-  - job: HelmJob
-    displayName: 'Pack and Push Helm Chart'
-    steps:
-    - script: |
-        echo "Packaging Helm chart..."
-        helm package ./chart
+            echo "Pushing Helm chart to repository..."
+            # Make sure 'helm push' plugin is installed
+            # helm push ./chart-*.tgz my-helm-repo
+          displayName: 'Pack & Push Helm Chart'
 
-        echo "Pushing Helm chart to repository..."
-        # Make sure 'helm push' plugin is installed
-        # helm push ./chart-*.tgz my-helm-repo
-      displayName: 'Pack & Push Helm Chart'
-
-- stage: PostBuild
-  displayName: 'Post-Build Stage'
-  dependsOn: HelmChartPack
-  condition: succeeded()
-  jobs:
-  - job: Cleanup
-    displayName: 'Post-Build Cleanup'
-    steps:
-    - script: |
-        echo "Cleanup steps or final notifications..."
-      displayName: 'Final Cleanup'
+  - stage: PostBuild
+    displayName: 'Post-Build Stage'
+    dependsOn: HelmChartPack
+    condition: succeeded()
+    jobs:
+    - job: Cleanup
+      displayName: 'Post-Build Cleanup'
+      steps:
+        - script: |
+            echo "Cleanup steps or final notifications..."
+          displayName: 'Final Cleanup'
 
