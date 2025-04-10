@@ -58,16 +58,16 @@ stages:
               if [ -d "tests" ]; then
                 ls -R tests
               else
-                echo "⚠️ No 'tests/' directory found. Skipping test check."
+                echo "No 'tests/' directory found. Skipping test check."
               fi
             displayName: 'Check Test Files'
 
           - script: |
               echo "Running tests with pytest..."
               if [ -d "tests" ]; then
-                pytest --maxfail=1 --disable-warnings -q || echo "⚠️ Some tests failed or none were found."
+                pytest --maxfail=1 --disable-warnings -q || echo " Some tests failed or none were found."
               else
-                echo "⚠️ Skipping pytest because no 'tests/' folder found."
+                echo " Skipping pytest because no 'tests/' folder found."
               fi
             displayName: 'Run Tests'
 
@@ -89,7 +89,7 @@ stages:
           # Проверка, что переменные не пустые перед логином
           - script: |
               if [ -z "$(DOCKER_USERNAME)" ] || [ -z "$(DOCKER_PASSWORD)" ]; then
-                echo "❌ DOCKER_USERNAME or DOCKER_PASSWORD is not set. Please check pipeline variables."
+                echo " DOCKER_USERNAME or DOCKER_PASSWORD is not set. Please check pipeline variables."
                 exit 1
               fi
             displayName: 'Check Docker Credentials'
@@ -97,7 +97,7 @@ stages:
           # Шаг для логина в Docker с добавлением подробного вывода
           - script: |
               echo "Logging in to Docker Hub..."
-              echo "$(DOCKER_PASSWORD)" | docker login -u "$(DOCKER_USERNAME)" --password-stdin || { echo "❌ Docker login failed"; exit 1; }
+              echo "$(DOCKER_PASSWORD)" | docker login -u "$(DOCKER_USERNAME)" --password-stdin || { echo " Docker login failed"; exit 1; }
             displayName: '**Docker Login**'
 
           # Шаг для сборки и пуша Docker-образа
@@ -121,7 +121,7 @@ stages:
         steps:
           - script: |
               echo "Packaging Helm chart..."
-              helm package ./chart || echo "⚠️ Chart folder not found."
+              helm package ./chart || echo " Chart folder not found."
 
               echo "NOTE: Add helm push plugin if needed"
               # helm push ./chart-*.tgz my-helm-repo
@@ -137,7 +137,7 @@ stages:
         displayName: 'Post-Build Cleanup'
         steps:
           - script: |
-              echo "✅ Pipeline finished. Cleanup complete."
+              echo " Pipeline finished. Cleanup complete."
             displayName: 'Final Cleanup'
 
 
