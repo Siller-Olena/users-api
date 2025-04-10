@@ -8,7 +8,6 @@ pool:
   vmImage: ubuntu-latest
 
 stages:
-
 - stage: PreBuild
   displayName: 'Pre-Build Stage'
   jobs:
@@ -23,7 +22,6 @@ stages:
         echo "Agent.TempDirectory: $(Agent.TempDirectory)"
       displayName: 'Show Variables'
 
-
 - stage: BuildAndTest
   displayName: 'Project: Build and Test'
   dependsOn: PreBuild
@@ -32,44 +30,31 @@ stages:
   - job: BuildTest
     displayName: 'Build and Test'
     steps:
-
-    # Шаг 1: Проверяем, что Python установлен
     - script: |
         echo "Checking Python version..."
         python --version
       displayName: 'Check Python Version'
 
-    # Шаг 2: Проверяем, что pip установлен
     - script: |
         echo "Checking pip version..."
         pip --version
       displayName: 'Check pip Version'
 
-    # Шаг 3: Устанавливаем зависимости из requirements.txt
     - script: |
         echo "Installing Python dependencies..."
         python -m pip install --upgrade pip
         pip install -r requirements.txt
       displayName: 'Install Requirements'
 
-    # Шаг 4: Устанавливаем pytest
     - script: |
         echo "Installing pytest..."
-        pip install pytest
+        pip install pytest  
       displayName: 'Install pytest'
 
-    # Шаг 5: Проверяем, что в проекте есть тесты
-    - script: |
-        echo "Checking for test files..."
-        find . -name "test_*.py" || (echo "No test files found" && exit 1)
-      displayName: 'Check for Test Files'
-
-    # Шаг 6: Запускаем тесты с помощью pytest
     - script: |
         echo "Running tests with pytest..."
-        pytest  # Запускаем тесты
+        pytest   # Запускаем тесты
       displayName: 'Run Tests'
-
 
 - stage: DockerBuildAndPush
   displayName: 'Docker: Build and Push'
@@ -79,7 +64,6 @@ stages:
   - job: DockerJob
     displayName: 'Docker Build and Push'
     steps:
-
     - script: |
         echo "Logging in to Docker Hub..."
         echo "$(DOCKER_PASSWORD)" | docker login -u "$(DOCKER_USERNAME)" --password-stdin
@@ -93,7 +77,6 @@ stages:
         echo "Pushing Docker $IMAGE_NAME"
         docker push $IMAGE_NAME
       displayName: '**Docker Build & Push**'
-
 
 - stage: HelmChartPack
   displayName: 'Helm Chart: Pack and Push'
@@ -111,7 +94,6 @@ stages:
         # Make sure 'helm push' plugin is installed
         # helm push ./chart-*.tgz my-helm-repo
       displayName: 'Pack & Push Helm Chart'
-
 
 - stage: PostBuild
   displayName: 'Post-Build Stage'
