@@ -82,15 +82,15 @@ stages:
         steps:
           - script: |
               echo "Logging in to Docker Hub..."
-              if [ -z "$DOCKER_USERNAME" ] || [ -z "$DOCKER_PASSWORD" ]; then
+              if [ -z "$(DOCKER_USERNAME)" ] || [ -z "$(DOCKER_PASSWORD)" ]; then
                 echo "❌ DOCKER_USERNAME or DOCKER_PASSWORD is not set. Please check pipeline variables."
                 exit 1
               fi
-              echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+              echo "$(DOCKER_PASSWORD)" | docker login -u "$(DOCKER_USERNAME)" --password-stdin
             displayName: '**Docker Login**'
 
           - script: |
-              IMAGE_NAME=$DOCKER_USERNAME/user-api:$(Build.BuildId)
+              IMAGE_NAME=$(DOCKER_USERNAME)/user-api:$(Build.BuildId)
               echo "Building Docker image: $IMAGE_NAME"
               docker build -t $IMAGE_NAME .
 
@@ -127,3 +127,4 @@ stages:
           - script: |
               echo "✅ Pipeline finished. Cleanup complete."
             displayName: 'Final Cleanup'
+
