@@ -98,7 +98,7 @@ stages:
           - script: |
               echo "Logging in to Docker Hub..."
               echo "Using username: $(DOCKER_USERNAME)"  # Виводимо логін для перевірки
-              echo "DOCKER_PASSWORD: $(DOCKER_PASSWORD)"  # Для перевірки токена
+              echo "DOCKER_PASSWORD is set: $(DOCKER_PASSWORD) != ''"  # Для перевірки токена
 
               # Логін в Docker Hub з паролем
               echo "$(DOCKER_PASSWORD)" | docker login -u "$(DOCKER_USERNAME)" --password-stdin || { echo "❌ Docker login failed"; exit 1; }
@@ -143,3 +143,4 @@ stages:
           - script: |
               echo "✅ Pipeline finished. Cleanup complete."
             displayName: 'Final Cleanup'
+
