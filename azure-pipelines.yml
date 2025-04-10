@@ -19,14 +19,19 @@ stages:
             fetchDepth: 0
             persistCredentials: true
           
+          # Шаг для вывода значений переменных в лог
           - script: |
-              echo "Printing predefined variables:"
+              echo "Printing Azure DevOps predefined variables:"
+              echo "Agent.TempDirectory: $(Agent.TempDirectory)"
+              echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
+              echo "Build.Repository.LocalPath: $(Build.Repository.LocalPath)"
+              echo "Build.Repository.Name: $(Build.Repository.Name)"
               echo "Build.SourceBranch: $(Build.SourceBranch)"
               echo "Build.SourceBranchName: $(Build.SourceBranchName)"
-              echo "Build.Repository.Name: $(Build.Repository.Name)"
-              echo "Agent.TempDirectory: $(Agent.TempDirectory)"
-            displayName: 'Show Variables'
-            
+              echo "Build.SourcesDirectory: $(Build.SourcesDirectory)"
+              echo "Build.StagingDirectory: $(Build.StagingDirectory)"
+            displayName: 'Print Azure DevOps Pipeline predefined variables'
+
   # === STAGE 2: BUILD & TEST ===
   - stage: BuildAndTest
     displayName: 'Project: Build and Test'
@@ -58,7 +63,7 @@ stages:
               if [ -d "tests" ]; then
                 ls -R tests
               else
-                echo "No 'tests/' directory found. Skipping test check."
+                echo " No 'tests/' directory found. Skipping test check."
               fi
             displayName: 'Check Test Files'
 
@@ -97,7 +102,7 @@ stages:
           # Шаг для логина в Docker с добавлением подробного вывода
           - script: |
               echo "Logging in to Docker Hub..."
-              echo "$(DOCKER_PASSWORD)" | docker login -u "$(DOCKER_USERNAME)" --password-stdin
+              echo "$(DOCKER_PASSWORD)" | docker login -u "$(DOCKER_USERNAME)" --password-stdin || { echo "❌ Docker login failed"; exit 1; }
             displayName: '**Docker Login**'
 
           # Шаг для сборки и пуша Docker-образа
@@ -126,7 +131,6 @@ stages:
               echo "NOTE: Add helm push plugin if needed"
               # helm push ./chart-*.tgz my-helm-repo
             displayName: 'Pack & Push Helm Chart'
-
 
   # === STAGE 5: CLEANUP ===
   - stage: PostBuild
