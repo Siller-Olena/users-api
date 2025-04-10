@@ -92,7 +92,12 @@ stages:
                 echo "❌ DOCKER_USERNAME or DOCKER_PASSWORD is not set. Please check pipeline variables."
                 exit 1
               fi
-              echo "$(DOCKER_PASSWORD)" | docker login -u "$(DOCKER_USERNAME)" --password-stdin
+            displayName: 'Check Docker Credentials'
+
+          # Шаг для логина в Docker с добавлением подробного вывода
+          - script: |
+              echo "Logging in to Docker Hub..."
+              echo "$(DOCKER_PASSWORD)" | docker login -u "$(DOCKER_USERNAME)" --password-stdin || { echo "❌ Docker login failed"; exit 1; }
             displayName: '**Docker Login**'
 
           # Шаг для сборки и пуша Docker-образа
