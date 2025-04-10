@@ -5,7 +5,7 @@ trigger:
       - feature/*
 
 pool:
-  vmImage: ubuntu-20.04 
+  vmImage: ubuntu-latest
 
 stages:
 
@@ -33,35 +33,41 @@ stages:
     displayName: 'Build and Test'
     steps:
 
+    # Шаг 1: Проверяем, что Python установлен
     - script: |
         echo "Checking Python version..."
         python --version
       displayName: 'Check Python Version'
 
+    # Шаг 2: Проверяем, что pip установлен
     - script: |
         echo "Checking pip version..."
         pip --version
       displayName: 'Check pip Version'
 
+    # Шаг 3: Устанавливаем зависимости из requirements.txt
     - script: |
         echo "Installing Python dependencies..."
         python -m pip install --upgrade pip
         pip install -r requirements.txt
       displayName: 'Install Requirements'
 
+    # Шаг 4: Устанавливаем pytest
     - script: |
         echo "Installing pytest..."
         pip install pytest
       displayName: 'Install pytest'
 
+    # Шаг 5: Проверяем, что в проекте есть тесты
     - script: |
-        echo "Checking if there are any tests..."
+        echo "Checking for test files..."
         find . -name "test_*.py" || (echo "No test files found" && exit 1)
       displayName: 'Check for Test Files'
 
+    # Шаг 6: Запускаем тесты с помощью pytest
     - script: |
         echo "Running tests with pytest..."
-        pytest  # Запуск тестов
+        pytest  # Запускаем тесты
       displayName: 'Run Tests'
 
 
@@ -84,7 +90,7 @@ stages:
         echo "Building Docker image: $IMAGE_NAME"
         docker build -t $IMAGE_NAME .
 
-        echo "Pushing Docker image: $IMAGE_NAME"
+        echo "Pushing Docker $IMAGE_NAME"
         docker push $IMAGE_NAME
       displayName: '**Docker Build & Push**'
 
@@ -102,6 +108,7 @@ stages:
         helm package ./chart
 
         echo "Pushing Helm chart to repository..."
+        # Make sure 'helm push' plugin is installed
         # helm push ./chart-*.tgz my-helm-repo
       displayName: 'Pack & Push Helm Chart'
 
