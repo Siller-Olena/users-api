@@ -8,7 +8,7 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  - group: 'USERS_API_VARIABLE_GROUP'  # Это подключение группы переменных
+  - group: 'USERS_API_VARIABLE_GROUP'  # Подключаем группу переменных
   - name: DockerId
     value: "$(DOCKER_ID)"
   - name: DockerToken
