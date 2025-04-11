@@ -8,7 +8,7 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  - group: 'USERS_API_VARIABLE_GROUP'  
+  - group: 'USERS_API_VARIABLE_GROUP'  # Убедитесь, что эта группа переменных существует в Library
   - name: DockerId
     value: "$(DOCKER_ID)"
   - name: DockerToken
@@ -21,7 +21,6 @@ variables:
 stages:
   # === STAGE 1: PRE-BUILD ===
   - stage: PreBuild
-    condition: or(eq(variables['Build.SourceBranch'], 'refs/heads/main'), startsWith(variables ['Build.SourceBranch']).)
     displayName: 'Pre-Build Stage'
     jobs:
       - job: PrintInfo
@@ -49,10 +48,8 @@ stages:
             displayName: 'Print Azure DevOps Pipeline predefined variables'  
             inputs:
               targetType: 'inline'
-
-              
               script: |
-                echo "Printing Azure DevOps predefined variables:"
+                echo "🔍 Printing Azure DevOps predefined variables:"
                 echo "Agent.TempDirectory: $(Agent.TempDirectory)"
                 echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
                 echo "Build.Repository.LocalPath: $(Build.Repository.LocalPath)"
@@ -66,7 +63,7 @@ stages:
   - stage: BuildAndTest
     displayName: 'Project: Build and Test'
     dependsOn: PreBuild
-    condition: or(eq(variables['Build.SourceBranch'], 'refs/heads/main'), startsWith(variables ['Build.SourceBranch']).)
+    condition: succeeded()
     jobs:
       - job: BuildTest
         displayName: 'Build and Test'
