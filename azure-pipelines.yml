@@ -32,18 +32,29 @@ stages:
   - stage: BuildAndTest
     displayName: 'Project: Build and Test'
     dependsOn: PreBuild
-    condition: always()
+    condition: succeeded()
     jobs:
       - job: BuildTest
         displayName: 'Build and Test'
         steps:
+          - checkout: self
+          -task: Bash@3
+           inputs:
+             targetType:'inline'
+
           - script: |
+              echo "Building the Spring Boot project..."
+              cd aquriumwithtechfish-main/Budget_PC_Configurator/ordersapi
+              chmod +x mvnw
+              ./mvnw clean package
+              mkdir -p "$(Build.ArtifactStagingDirectory)/binaries"
+            displayName: "Build Service(B1)"  
               echo "Checking the current branch name:"
               echo "Build.SourceBranchName: $(Build.SourceBranchName)"
               echo "Build.SourceBranch: $(Build.SourceBranch)"
             displayName: 'Check Branch Name'
 
-          # ✅ Исправлено: не падать, если requirements.txt отсутствует
+          
           - script: |
               if [ -f "requirements.txt" ]; then
                 echo "Installing dependencies from requirements.txt..."
