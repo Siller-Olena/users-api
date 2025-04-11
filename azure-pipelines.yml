@@ -8,7 +8,15 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  - group: 'Docker Access Token'  # Группа переменных из Azure DevOps Library
+  - group: 'USERS_API_VARIABLE_GROUP'  # Підключення групи змінних
+  - name: DockerId
+    value: "$(DOCKER_ID)"  # Конкретна змінна
+  - name: DockerToken
+    value: "$(DOCKER_TOKEN)"  # Конкретна змінна
+  - name: DockerRepo
+    value: "$(DOCKER_REPO)"  # Конкретна змінна
+  - name: ServiceName
+    value: "$(SERVICE_NAME)"  # Конкретна змінна
 
 stages:
   # === STAGE 1: PRE-BUILD ===
@@ -19,6 +27,22 @@ stages:
         displayName: 'Print Azure DevOps Variables'
         steps:
           - checkout: self
+            fetchDepth: 0
+            persistCredentials: true
+          - script: |
+              chmod +x "$(Build.SourcesDirectory)/ci-templates/common-scripts/logging.sh"
+              chmod +x "$(Build.SourcesDirectory)/ci-templates/common-scripts/dockerhub.sh"
+            displayName: 'Make scripts executable'
+
+          - script: |
+               sed -i 's/\r$//' "$(Build.SourcesDirectory)/ci-templates/common-scripts/logging.sh"
+               sed -i 's/\r$//' "$(Build.SourcesDirectory)/ci-templates/common-scripts/dockerhub.sh"
+            displayName: 'Fix line endings in scripts'
+
+          - script: |
+              . "$(Build.SourcesDirectory)/ci-templates/common-scripts/logging.sh" 
+              info_msg "Logging is active"
+            displayName: 'Run logging script'
 
           - script: |
               echo "🔍 Printing Azure DevOps predefined variables:"
@@ -142,7 +166,3 @@ stages:
           - script: |
               echo "🧹 Pipeline finished. Cleanup complete."
             displayName: 'Final Cleanup'
-
-
-
-
