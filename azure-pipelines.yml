@@ -6,7 +6,16 @@ trigger:
 
 pool:
   vmImage: 'ubuntu-latest'
-
+  variables: 
+    - group: 'USERS_API_VARIABLE_GROUP'
+    - name: DockerId
+  value: "$(DOCKER_ID)"
+    - name: DockerToken
+  value: "$(DOCKER_TOKEN)"
+    - name: DockerRepo
+  value: "$(DOCKER_REPO)"
+    - name: ServiceName
+  value: "$(SERVICE_NAME)"
 stages:
   # === STAGE 1: PRE-BUILD ===
   - stage: PreBuild
