@@ -9,147 +9,135 @@ pool:
 
 variables:
   - group: 'Docker Access Token'
-  - name: DockerId
-    value: $(DOCKER_ID)
-  - name: DockerToken
-    value: $(DOCKER_TOKEN)
-  - name: DockerRepo
-    value: $(DOCKER_REPO)
-  - name: ServiceName
-    value: $(SERVICE_NAME)
 
 stages:
+  # === STAGE 1: PRE-BUILD ===
+  - stage: PreBuild
+    displayName: 'Pre-Build Stage'
+    jobs:
+      - job: PrintInfo
+        displayName: 'Print Azure DevOps Variables'
+        steps:
+          - checkout: self
+            fetchDepth: 0
+            persistCredentials: true
+          
+          - script: |
+              echo "Printing Azure DevOps predefined variables:"
+              echo "Agent.TempDirectory: $(Agent.TempDirectory)"
+              echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
+              echo "Build.Repository.LocalPath: $(Build.Repository.LocalPath)"
+              echo "Build.Repository.Name: $(Build.Repository.Name)"
+              echo "Build.SourceBranch: $(Build.SourceBranch)"
+              echo "Build.SourceBranchName: $(Build.SourceBranchName)"
+              echo "Build.SourcesDirectory: $(Build.SourcesDirectory)"
+              echo "Build.StagingDirectory: $(Build.StagingDirectory)"
+            displayName: 'Print Azure DevOps Pipeline predefined variables'
 
-# === STAGE 1: PRE-BUILD ===
-- stage: PreBuild
-  displayName: 'Pre-Build Stage'
-  jobs:
-    - job: PrintInfo
-      displayName: 'Print Azure DevOps Variables'
-      steps:
-        - checkout: self
-
-        - script: |
-            echo "Azure DevOps predefined variables:"
-            echo "Agent.TempDirectory: $(Agent.TempDirectory)"
-            echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
-            echo "Build.Repository.LocalPath: $(Build.Repository.LocalPath)"
-            echo "Build.Repository.Name: $(Build.Repository.Name)"
-            echo "Build.SourceBranch: $(Build.SourceBranch)"
-            echo "Build.SourceBranchName: $(Build.SourceBranchName)"
-            echo "Build.SourcesDirectory: $(Build.SourcesDirectory)"
-            echo "Build.StagingDirectory: $(Build.StagingDirectory)"
-          displayName: 'Print Azure DevOps Pipeline predefined variables'
-
-# === STAGE 2: BUILD & TEST ===
-- stage: BuildAndTest
-  displayName: 'Project: Build and Test'
-  dependsOn: PreBuild
-  condition: succeeded()
-  jobs:
-    - job: BuildTest
-      displayName: 'Build and Test'
-      steps:
-        - script: |
-            echo "Installing dependencies..."
-            python -m pip install --upgrade pip
-            if [ -f requirements.txt ]; then
+  # === STAGE 2: BUILD & TEST ===
+  - stage: BuildAndTest
+    displayName: 'Project: Build and Test'
+    dependsOn: PreBuild
+    condition: succeeded()
+    jobs:
+      - job: BuildTest
+        displayName: 'Build and Test'
+        steps:
+          - script: |
+              echo "Installing Python and dependencies..."
+              python -m pip install --upgrade pip
               pip install -r requirements.txt
-            else
-              echo "⚠️ requirements.txt not found. Skipping installation."
-            fi
-          displayName: 'Install Requirements'
+            displayName: 'Install Requirements'
 
-        - script: |
-            echo "Installing pytest..."
-            pip install pytest
-          displayName: 'Install pytest'
+          - script: |
+              echo "Installing pytest..."
+              pip install pytest
+            displayName: 'Install pytest'
 
-        - script: |
-            echo "Checking Python version..."
-            python --version
-            pip --version
-          displayName: 'Check Python and Pip Versions'
+          - script: |
+              echo "Checking Python and pip versions..."
+              python --version
+              pip --version
+            displayName: 'Check Python and Pip Versions'
 
-        - script: |
-            echo "Checking if tests directory exists..."
-            if [ -d "tests" ]; then
-              ls -R tests
-            else
-              echo "⚠️ No 'tests/' directory found."
-            fi
-          displayName: 'Check Test Files'
+          - script: |
+              echo "Checking if test files exist..."
+              if [ -d "tests" ]; then
+                ls -R tests
+              else
+                echo "⚠️ No 'tests/' directory found. Skipping test check."
+              fi
+            displayName: 'Check Test Files'
 
-        - script: |
-            echo "Running tests with pytest..."
-            if [ -d "tests" ]; then
-              pytest --maxfail=1 --disable-warnings -q || echo "⚠️ Tests failed or not found."
-            else
-              echo "⚠️ Skipping pytest because 'tests/' does not exist."
-            fi
-          displayName: 'Run Tests'
+          - script: |
+              echo "Running tests with pytest..."
+              if [ -d "tests" ]; then
+                pytest --maxfail=1 --disable-warnings -q || echo "⚠️ Some tests failed or none were found."
+              else
+                echo "⚠️ Skipping pytest because no 'tests/' folder found."
+              fi
+            displayName: 'Run Tests'
 
-# === STAGE 3: DOCKER BUILD & PUSH ===
-- stage: DockerBuildAndPush
-  displayName: 'Docker: Build and Push'
-  dependsOn: BuildAndTest
-  condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'main'))
-  jobs:
-    - job: DockerJob
-      displayName: 'Docker Build and Push'
-      steps:
-        - script: |
-            echo "DOCKER_ID: $(DockerId)"
-            echo "DOCKER_TOKEN is set: $(DockerToken) != ''"
-          displayName: 'Print Docker Credentials'
+  # === STAGE 3: DOCKER BUILD & PUSH ===
+  - stage: DockerBuildAndPush
+    displayName: 'Docker: Build and Push'
+    dependsOn: BuildAndTest
+    condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'main'))
+    jobs:
+      - job: DockerJob
+        displayName: 'Docker Build and Push'
+        steps:
+          - script: |
+              echo "Checking Docker credentials..."
+              if [ -z "$(DOCKER_ID)" ] || [ -z "$(DOCKER_TOKEN)" ]; then
+                echo "❌ DOCKER_ID or DOCKER_TOKEN is not set."
+                exit 1
+              fi
+            displayName: 'Check Docker Credentials'
 
-        - script: |
-            if [ -z "$(DockerId)" ] || [ -z "$(DockerToken)" ]; then
-              echo "❌ DockerId or DockerToken is not set."
-              exit 1
-            fi
-          displayName: 'Check Docker Credentials'
+          - script: |
+              echo "Logging in to Docker Hub..."
+              echo "$(DOCKER_TOKEN)" | docker login -u "$(DOCKER_ID)" --password-stdin || {
+                echo "❌ Docker login failed";
+                exit 1;
+              }
+            displayName: '**Docker Login**'
 
-        - script: |
-            echo "Logging into Docker Hub..."
-            echo "$(DockerToken)" | docker login -u "$(DockerId)" --password-stdin || { echo "❌ Docker login failed"; exit 1; }
-          displayName: '**Docker Login**'
+          - script: |
+              IMAGE_NAME=$(DOCKER_ID)/user-api:$(Build.BuildId)
+              echo "Building Docker image: $IMAGE_NAME"
+              docker build -t $IMAGE_NAME .
 
-        - script: |
-            IMAGE_NAME=$(DockerRepo):$(Build.BuildId)
-            echo "Building Docker image: $IMAGE_NAME"
-            docker build -t $IMAGE_NAME .
+              echo "Pushing Docker image: $IMAGE_NAME"
+              docker push $IMAGE_NAME
+            displayName: '**Docker Build & Push**'
 
-            echo "Pushing Docker image: $IMAGE_NAME"
-            docker push $IMAGE_NAME
-          displayName: '**Docker Build & Push**'
+  # === STAGE 4: HELM PACK ===
+  - stage: HelmChartPack
+    displayName: 'Helm Chart: Pack and Push'
+    dependsOn: DockerBuildAndPush
+    condition: succeeded()
+    jobs:
+      - job: HelmJob
+        displayName: 'Pack and Push Helm Chart'
+        steps:
+          - script: |
+              echo "Packaging Helm chart..."
+              helm package ./chart || echo "⚠️ Chart folder not found."
+            displayName: 'Pack Helm Chart'
 
-# === STAGE 4: HELM PACK (опционально) ===
-- stage: HelmChartPack
-  displayName: 'Helm Chart: Pack and Push'
-  dependsOn: DockerBuildAndPush
-  condition: succeeded()
-  jobs:
-    - job: HelmJob
-      displayName: 'Pack and Push Helm Chart'
-      steps:
-        - script: |
-            echo "Packaging Helm chart..."
-            helm package ./chart || echo "⚠️ Chart folder not found."
-            echo "Add helm push plugin if needed."
-          displayName: 'Pack & Push Helm Chart'
-
-# === STAGE 5: CLEANUP ===
-- stage: PostBuild
-  displayName: 'Post-Build Stage'
-  dependsOn: HelmChartPack
-  condition: succeeded()
-  jobs:
-    - job: Cleanup
-      displayName: 'Post-Build Cleanup'
-      steps:
-        - script: echo "✅ Pipeline complete. Cleanup done."
-          displayName: 'Final Cleanup'
+  # === STAGE 5: CLEANUP ===
+  - stage: PostBuild
+    displayName: 'Post-Build Stage'
+    dependsOn: HelmChartPack
+    condition: succeeded()
+    jobs:
+      - job: Cleanup
+        displayName: 'Post-Build Cleanup'
+        steps:
+          - script: |
+              echo "✅ Pipeline finished. Cleanup complete."
+            displayName: 'Final Cleanup'
 
 
 
