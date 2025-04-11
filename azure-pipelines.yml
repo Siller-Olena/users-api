@@ -8,7 +8,7 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  - group: 'USERS_API_VARIABLE_GROUP'  # Подключаем группу переменных
+  - group: 'USERS_API_VARIABLE_GROUP'  # Make sure this group exists in the Library
   - name: DockerId
     value: "$(DOCKER_ID)"
   - name: DockerToken
@@ -169,4 +169,3 @@ stages:
           - script: |
               echo "🧹 Pipeline finished. Cleanup complete."
             displayName: 'Final Cleanup'
-
