@@ -18,6 +18,7 @@ variables:
   - name: ServiceName
     value: "$(SERVICE_NAME)"
 
+
 stages:
   # === STAGE 1: PRE-BUILD ===
   - stage: PreBuild
