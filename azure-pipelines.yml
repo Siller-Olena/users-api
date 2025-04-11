@@ -7,7 +7,7 @@ trigger:
 pool:
   vmImage: 'ubuntu-latest'
 variables:
-  - group: 'USERS_API_VARIABLE_GROUP'
+  - group: 'Docker Access Token'
   - name: DockerId
     value: $(DOCKER_ID)
   - name: DockerToken
