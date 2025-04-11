@@ -8,6 +8,7 @@ pool:
   vmImage: 'ubuntu-latest'
 
 stages:
+  # === STAGE 1: PRE-BUILD ===
   - stage: PreBuild
     displayName: 'Pre-Build Stage'
     jobs:
@@ -17,6 +18,7 @@ stages:
           - checkout: self
             fetchDepth: 0
             persistCredentials: true
+
           - script: |
               echo "Printing predefined variables:"
               echo "Build.SourceBranch: $(Build.SourceBranch)"
@@ -24,11 +26,14 @@ stages:
               echo "Build.Repository.Name: $(Build.Repository.Name)"
               echo "Agent.TempDirectory: $(Agent.TempDirectory)"
             displayName: 'Show Variables'
+        condition: always()  # Эта стадия всегда будет выполняться
 
+  # === STAGE 2: BUILD & TEST ===
   - stage: BuildAndTest
     displayName: 'Project: Build and Test'
     dependsOn: PreBuild
-    condition: always()
+    # Убираем условие, чтобы просто проверить, будет ли эта стадия выполняться
+    condition: always()  # Сделано для теста, чтобы всегда выполнялась
     jobs:
       - job: BuildTest
         displayName: 'Build and Test'
@@ -39,15 +44,22 @@ stages:
               echo "Build.SourceBranch: $(Build.SourceBranch)"
             displayName: 'Check Branch Name'
 
-          # Исправленный скрипт: не завершать выполнение, если нет requirements.txt
+          # Исправление: путь к requirements.txt, если он в другой папке
           - script: |
               echo "Checking for the presence of requirements.txt..."
               if [ -f "requirements.txt" ]; then
                 echo "requirements.txt found."
               else
-                echo "❌ requirements.txt not found! Continuing without it."
+                echo "❌ requirements.txt not found! Please check your repository structure."
+                exit 1
               fi
             displayName: 'Check requirements.txt'
+
+          - script: |
+              echo "Installing Python and dependencies..."
+              python -m pip install --upgrade pip
+              pip install -r requirements.txt
+            displayName: 'Install Requirements'
 
           - script: |
               echo "Installing pytest..."
@@ -75,6 +87,7 @@ stages:
               pytest --maxfail=1 --disable-warnings -q || echo "⚠️ Some tests failed or none were found."
             displayName: 'Run Tests'
 
+  # === STAGE 3: DOCKER BUILD & PUSH ===
   - stage: DockerBuildAndPush
     displayName: 'Docker: Build and Push'
     dependsOn: BuildAndTest
@@ -101,6 +114,7 @@ stages:
               docker push $IMAGE_NAME
             displayName: '**Docker Build & Push**'
 
+  # === STAGE 4: HELM PACK ===
   - stage: HelmChartPack
     displayName: 'Helm Chart: Pack and Push'
     dependsOn: DockerBuildAndPush
@@ -117,6 +131,7 @@ stages:
               # helm push ./chart-*.tgz my-helm-repo
             displayName: 'Pack & Push Helm Chart'
 
+  # === STAGE 5: CLEANUP ===
   - stage: PostBuild
     displayName: 'Post-Build Stage'
     dependsOn: HelmChartPack
