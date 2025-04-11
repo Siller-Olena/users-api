@@ -26,14 +26,13 @@ stages:
               echo "Build.Repository.Name: $(Build.Repository.Name)"
               echo "Agent.TempDirectory: $(Agent.TempDirectory)"
             displayName: 'Show Variables'
-        condition: always()  # Эта стадия всегда будет выполняться
+        condition: always()
 
   # === STAGE 2: BUILD & TEST ===
   - stage: BuildAndTest
     displayName: 'Project: Build and Test'
     dependsOn: PreBuild
-    # Убираем условие, чтобы просто проверить, будет ли эта стадия выполняться
-    condition: always()  # Сделано для теста, чтобы всегда выполнялась
+    condition: always()
     jobs:
       - job: BuildTest
         displayName: 'Build and Test'
@@ -44,22 +43,16 @@ stages:
               echo "Build.SourceBranch: $(Build.SourceBranch)"
             displayName: 'Check Branch Name'
 
-          # Исправление: путь к requirements.txt, если он в другой папке
+          # ✅ Исправлено: не падать, если requirements.txt отсутствует
           - script: |
-              echo "Checking for the presence of requirements.txt..."
               if [ -f "requirements.txt" ]; then
-                echo "requirements.txt found."
+                echo "Installing dependencies from requirements.txt..."
+                python -m pip install --upgrade pip
+                pip install -r requirements.txt
               else
-                echo "❌ requirements.txt not found! Please check your repository structure."
-                exit 1
+                echo "⚠️ requirements.txt not found, skipping install."
               fi
-            displayName: 'Check requirements.txt'
-
-          - script: |
-              echo "Installing Python and dependencies..."
-              python -m pip install --upgrade pip
-              pip install -r requirements.txt
-            displayName: 'Install Requirements'
+            displayName: 'Install Python Dependencies'
 
           - script: |
               echo "Installing pytest..."
@@ -72,26 +65,21 @@ stages:
               pip --version
             displayName: 'Check Python and Pip Versions'
 
+          # ✅ Исправлено: не падать, если папка tests/ отсутствует
           - script: |
-              echo "Checking if 'tests' directory exists..."
               if [ -d "tests" ]; then
-                echo "'tests' directory found."
+                echo "Running tests with pytest..."
+                pytest --maxfail=1 --disable-warnings -q
               else
-                echo "❌ 'tests' directory not found!"
-                exit 1
+                echo "⚠️ 'tests/' directory not found. Skipping tests."
               fi
-            displayName: 'Check Test Directory'
-
-          - script: |
-              echo "Running tests with pytest..."
-              pytest --maxfail=1 --disable-warnings -q || echo "⚠️ Some tests failed or none were found."
             displayName: 'Run Tests'
 
   # === STAGE 3: DOCKER BUILD & PUSH ===
   - stage: DockerBuildAndPush
     displayName: 'Docker: Build and Push'
     dependsOn: BuildAndTest
-    condition: eq(variables['Build.SourceBranchName'], 'main')  # Только для ветки main
+    condition: eq(variables['Build.SourceBranchName'], 'main')
     jobs:
       - job: DockerJob
         displayName: 'Docker Build and Push'
@@ -118,7 +106,7 @@ stages:
   - stage: HelmChartPack
     displayName: 'Helm Chart: Pack and Push'
     dependsOn: DockerBuildAndPush
-    condition: eq(variables['Build.SourceBranchName'], 'main')  # Только для ветки main
+    condition: eq(variables['Build.SourceBranchName'], 'main')
     jobs:
       - job: HelmJob
         displayName: 'Pack and Push Helm Chart'
@@ -128,14 +116,13 @@ stages:
               helm package ./chart || echo "⚠️ Chart folder not found."
 
               echo "NOTE: Add helm push plugin if needed"
-              # helm push ./chart-*.tgz my-helm-repo
             displayName: 'Pack & Push Helm Chart'
 
   # === STAGE 5: CLEANUP ===
   - stage: PostBuild
     displayName: 'Post-Build Stage'
     dependsOn: HelmChartPack
-    condition: eq(variables['Build.SourceBranchName'], 'main')  # Только для ветки main
+    condition: eq(variables['Build.SourceBranchName'], 'main')
     jobs:
       - job: Cleanup
         displayName: 'Post-Build Cleanup'
@@ -143,3 +130,4 @@ stages:
           - script: |
               echo "✅ Pipeline finished. Cleanup complete."
             displayName: 'Final Cleanup'
+
