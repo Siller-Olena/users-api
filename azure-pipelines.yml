@@ -8,15 +8,15 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  - group: 'USERS_API_VARIABLE_GROUP'  # Підключення групи змінних
+  - group: 'USERS_API_VARIABLE_GROUP'  # Это подключение группы переменных
   - name: DockerId
-    value: "$(DOCKER_ID)"  # Конкретна змінна
+    value: "$(DOCKER_ID)"
   - name: DockerToken
-    value: "$(DOCKER_TOKEN)"  # Конкретна змінна
+    value: "$(DOCKER_TOKEN)"
   - name: DockerRepo
-    value: "$(DOCKER_REPO)"  # Конкретна змінна
+    value: "$(DOCKER_REPO)"
   - name: ServiceName
-    value: "$(SERVICE_NAME)"  # Конкретна змінна
+    value: "$(SERVICE_NAME)"
 
 stages:
   # === STAGE 1: PRE-BUILD ===
@@ -42,19 +42,22 @@ stages:
           - script: |
               . "$(Build.SourcesDirectory)/ci-templates/common-scripts/logging.sh" 
               info_msg "Logging is active"
-            displayName: 'Run logging script'
+            displayName: 'Run logging script'  
 
-          - script: |
-              echo "🔍 Printing Azure DevOps predefined variables:"
-              echo "Agent.TempDirectory: $(Agent.TempDirectory)"
-              echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
-              echo "Build.Repository.LocalPath: $(Build.Repository.LocalPath)"
-              echo "Build.Repository.Name: $(Build.Repository.Name)"
-              echo "Build.SourceBranch: $(Build.SourceBranch)"
-              echo "Build.SourceBranchName: $(Build.SourceBranchName)"
-              echo "Build.SourcesDirectory: $(Build.SourcesDirectory)"
-              echo "Build.StagingDirectory: $(Build.StagingDirectory)"
-            displayName: 'Print Azure DevOps Pipeline predefined variables'
+          - task: Bash@3
+            displayName: 'Print Azure DevOps Pipeline predefined variables'  
+            inputs:
+              targetType: 'inline'
+              script: |
+                echo "🔍 Printing Azure DevOps predefined variables:"
+                echo "Agent.TempDirectory: $(Agent.TempDirectory)"
+                echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
+                echo "Build.Repository.LocalPath: $(Build.Repository.LocalPath)"
+                echo "Build.Repository.Name: $(Build.Repository.Name)"
+                echo "Build.SourceBranch: $(Build.SourceBranch)"
+                echo "Build.SourceBranchName: $(Build.SourceBranchName)"
+                echo "Build.SourcesDirectory: $(Build.SourcesDirectory)"
+                echo "Build.StagingDirectory: $(Build.StagingDirectory)"
 
   # === STAGE 2: BUILD & TEST ===
   - stage: BuildAndTest
@@ -166,3 +169,4 @@ stages:
           - script: |
               echo "🧹 Pipeline finished. Cleanup complete."
             displayName: 'Final Cleanup'
+
