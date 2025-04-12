@@ -8,7 +8,6 @@ pool:
   vmImage: 'ubuntu-latest'
 
 stages:
-  # === STAGE 1: PRE-BUILD ===
   - stage: PreBuild
     displayName: 'Pre-Build'
     jobs:
@@ -18,18 +17,18 @@ stages:
           - script: |
               echo "Hello, from Pre-Build Job"
             displayName: 'Pre-Build Step'
-          - script: |
-            echo "Agent.TempDirectory: $(Agent.TempDirectory)"
-            echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
-            echo "Build.Repository.LocalPath: $(Build.Repository.LocalPath)"
-            echo "Build.Repository.Name: $(Build.Repository.Name)"
-            echo "Build.SourceBranch: $(Build.SourceBranch)"
-            echo "Build.SourceBranchName: $(Build.SourceBranchName)"
-            echo "Build.SourcesDirectory: $(Build.SourcesDirectory)"
-            echo "Build.StagingDirectory: $(Build.StagingDirectory)"
-          displayName: 'Print Azure DevOps Pipeline predefined variables'  
 
-  # === STAGE 2: BUILD AND TEST ===
+          - script: |
+              echo "Agent.TempDirectory: $(Agent.TempDirectory)"
+              echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
+              echo "Build.Repository.LocalPath: $(Build.Repository.LocalPath)"
+              echo "Build.Repository.Name: $(Build.Repository.Name)"
+              echo "Build.SourceBranch: $(Build.SourceBranch)"
+              echo "Build.SourceBranchName: $(Build.SourceBranchName)"
+              echo "Build.SourcesDirectory: $(Build.SourcesDirectory)"
+              echo "Build.StagingDirectory: $(Build.StagingDirectory)"
+            displayName: 'Print Azure DevOps Pipeline predefined variables'
+
   - stage: BuildAndTest
     displayName: 'Project: Build and Test'
     dependsOn: PreBuild
@@ -42,7 +41,6 @@ stages:
               echo "Hello, from Build and Test Job"
             displayName: 'Build and Test Step'
 
-  # === STAGE 3: DOCKER BUILD AND PUSH ===
   - stage: DockerBuildAndPush
     displayName: 'Docker: Build and Push'
     dependsOn: BuildAndTest
@@ -55,7 +53,6 @@ stages:
               echo "Hello, from Docker Build and Push Job"
             displayName: 'Docker Step'
 
-  # === STAGE 4: HELM CHART PACK ===
   - stage: HelmChartPack
     displayName: 'Helm Chart: Pack and Push'
     dependsOn: DockerBuildAndPush
@@ -68,7 +65,6 @@ stages:
               echo "Hello, from Helm Chart Pack and Push Job"
             displayName: 'Helm Chart Step'
 
-  # === STAGE 5: POST-BUILD ===
   - stage: PostBuild
     displayName: 'Post-Build'
     dependsOn: HelmChartPack
@@ -80,3 +76,4 @@ stages:
           - script: |
               echo "Hello, from Post-Build Job"
             displayName: 'Post-Build Step'
+
