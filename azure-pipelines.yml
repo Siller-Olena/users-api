@@ -18,6 +18,16 @@ stages:
           - script: |
               echo "Hello, from Pre-Build Job"
             displayName: 'Pre-Build Step'
+          - script: |
+            echo "Agent.TempDirectory: $(Agent.TempDirectory)"
+            echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
+            echo "Build.Repository.LocalPath: $(Build.Repository.LocalPath)"
+            echo "Build.Repository.Name: $(Build.Repository.Name)"
+            echo "Build.SourceBranch: $(Build.SourceBranch)"
+            echo "Build.SourceBranchName: $(Build.SourceBranchName)"
+            echo "Build.SourcesDirectory: $(Build.SourcesDirectory)"
+            echo "Build.StagingDirectory: $(Build.StagingDirectory)"
+          displayName: 'Print Azure DevOps Pipeline predefined variables'  
 
   # === STAGE 2: BUILD AND TEST ===
   - stage: BuildAndTest
