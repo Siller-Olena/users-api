@@ -7,7 +7,13 @@ trigger:
 pool:
   vmImage: 'ubuntu-latest'
 
+variables:
+  dockerRepo: 'your-docker-username'
+  serviceName: 'your-service-name'
+  appVersion: '1.0.0' # або залиш пустим для автогенерації
+
 stages:
+  # 🔹 PreBuild Stage (без змін)
   - stage: PreBuild
     displayName: 'Pre-Build'
     jobs:
@@ -29,6 +35,7 @@ stages:
               echo "Build.StagingDirectory: $(Build.StagingDirectory)"
             displayName: 'Print Azure DevOps Pipeline predefined variables'
 
+  # 🔸 Завдання Б1-Б2: Build and Test Stage
   - stage: BuildAndTest
     displayName: 'Project: Build and Test'
     dependsOn: PreBuild
@@ -38,21 +45,63 @@ stages:
         displayName: 'Build And Test'
         steps:
           - script: |
-              echo "Hello, from Build and Test Job"
-            displayName: 'Build and Test Step'
+              echo "🔧 Building the project..."
+              make build
+            displayName: 'Task Б1: Build project'
 
+          - script: |
+              echo "🧪 Running unit tests..."
+              make test
+            displayName: 'Task Б2: Run unit tests'
+
+          - task: PublishPipelineArtifact@1
+            displayName: 'Publish Build Artifacts'
+            inputs:
+              targetPath: '$(Build.ArtifactStagingDirectory)'
+              artifact: 'build-artifacts'
+              publishLocation: 'pipeline'
+
+  # 🔸 Завдання В1-В2 + Г1-Г2: Docker Build & Push
   - stage: DockerBuildAndPush
     displayName: 'Docker: Build and Push'
     dependsOn: BuildAndTest
-    condition: succeeded()
+    condition: eq(variables['Build.SourceBranchName'], 'main') # Г1: Тільки для main
     jobs:
       - job: BuildAndPush
         displayName: 'Build and Push'
         steps:
           - script: |
-              echo "Hello, from Docker Build and Push Job"
-            displayName: 'Docker Step'
+              echo "🐳 Building Docker image..."
+              docker build -t $(dockerRepo)/$(serviceName):$(appVersion) .
+            displayName: 'Task В1: Docker build'
 
+          - script: |
+              echo "📦 Saving Docker image to tar file..."
+              mkdir -p $(Build.ArtifactStagingDirectory)/docker
+              docker save -o $(Build.ArtifactStagingDirectory)/docker/$(serviceName)_$(appVersion).tar $(dockerRepo)/$(serviceName):$(appVersion)
+            displayName: 'Task В2: Save image as artifact'
+
+          - task: PublishPipelineArtifact@1
+            displayName: 'Publish Docker image artifact'
+            inputs:
+              targetPath: '$(Build.ArtifactStagingDirectory)/docker'
+              artifact: 'docker-image'
+
+          - task: Docker@2
+            displayName: 'Task Г2: Docker Login'
+            inputs:
+              command: login
+              containerRegistry: 'DockerHubServiceConnection' # 🔐 Задається в Azure DevOps як service connection
+
+          - task: Docker@2
+            displayName: 'Task Г2: Push Docker Image'
+            inputs:
+              command: push
+              repository: '$(dockerRepo)/$(serviceName)'
+              tags: |
+                $(appVersion)
+
+  # 🧵 Helm Chart Stage (залишаємо базовим)
   - stage: HelmChartPack
     displayName: 'Helm Chart: Pack and Push'
     dependsOn: DockerBuildAndPush
@@ -62,9 +111,10 @@ stages:
         displayName: 'Pack and Push'
         steps:
           - script: |
-              echo "Hello, from Helm Chart Pack and Push Job"
+              echo "📦 Helm chart packaging (поки заглушка)"
             displayName: 'Helm Chart Step'
 
+  # ✅ Post Build (фінальна частина)
   - stage: PostBuild
     displayName: 'Post-Build'
     dependsOn: HelmChartPack
@@ -74,6 +124,7 @@ stages:
         displayName: 'Post-Build'
         steps:
           - script: |
-              echo "Hello, from Post-Build Job"
+              echo "🎉 Pipeline completed successfully"
             displayName: 'Post-Build Step'
+
 
