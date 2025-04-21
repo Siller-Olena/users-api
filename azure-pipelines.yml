@@ -8,9 +8,9 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  dockerRepo: 'your-docker-username'
-  serviceName: 'your-service-name'
-  appVersion: '1.0.0' # або залиш пустим для автогенерації
+  dockerRepo: 'sillerolena/lab4'
+  serviceName: 'sillerolena'
+  appVersion: ' '
 
 stages:
   # 🔹 PreBuild Stage (без змін)
