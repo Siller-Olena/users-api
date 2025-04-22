@@ -1,131 +1,117 @@
 trigger:
-  branches:
-    include:
-      - main
-      - feature/*
+  branches:
+    include:
+      - main
+      - feature/*
 
 pool:
-  vmImage: 'ubuntu-latest'
-
-resources:
-  repositories:
-    - repository: ciTemplates
-      type: git
-      name: ProjectName/ci-templates  # Замените на реальную ссылку на репозиторий
-
-variables:
-  - group: docker-settings
-  - name: FORCED_VERSION
-    value: ''
+  vmImage: 'ubuntu-latest'
 
 stages:
-  # === STAGE 1: PRE-BUILD ===
-  - stage: StageID_PreBuild
-    displayName: 'Pre-Build'
-    jobs:
-      - job: JobID_PreBuild
-        displayName: 'Pre-Build'
-        steps:
-          # Шаг 1: Checkout репозитория
-          - checkout: self
-            fetchDepth: 0
-            persistCredentials: true
+  # === STAGE 1: PRE-BUILD ===
+  - stage: PreBuild
+    displayName: 'Pre-Build'
+    jobs:
+      - job: PreBuildAnalysis
+        displayName: 'Pre-Build Analysis'
+        steps:
+          - script: |
+              echo "Hello, from Pre-Build Job"
+            displayName: 'Pre-Build Step'
 
-          # Шаг 2: Checkout ci-templates
-          - checkout: ciTemplates
-            fetchDepth: 0
-            persistCredentials: true
+          - script: |
+              echo "Agent.TempDirectory: $(Agent.TempDirectory)"
+              echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
+              echo "Build.Repository.LocalPath: $(Build.Repository.LocalPath)"
+              echo "Build.Repository.Name: $(Build.Repository.Name)"
+              echo "Build.SourceBranch: $(Build.SourceBranch)"
+              echo "Build.SourceBranchName: $(Build.SourceBranchName)"
+              echo "Build.SourcesDirectory: $(Build.SourcesDirectory)"
+              echo "Build.StagingDirectory: $(Build.StagingDirectory)"
+            displayName: 'Print Azure DevOps Pipeline predefined variables'
 
-          # Шаг 3: Логирование информации
-          - script: |
-              source $(Pipeline.Workspace)/ciTemplates/common-scripts/logging.sh
-              info_msg "Starting PreBuild..."
-              info_msg "Agent.TempDirectory: $(Agent.TempDirectory)"
-              info_msg "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
-              info_msg "Build.Repository.LocalPath: $(Build.Repository.LocalPath)"
-              info_msg "Build.Repository.Name: $(Build.Repository.Name)"
-              info_msg "Build.SourceBranch: $(Build.SourceBranch)"
-              info_msg "Build.SourceBranchName: $(Build.SourceBranchName)"
-              info_msg "Build.SourcesDirectory: $(Build.SourcesDirectory)"
-              info_msg "Build.StagingDirectory: $(Build.StagingDirectory)"
-            displayName: 'Log Pre-Build Information'
+  # === STAGE 2: BUILD AND TEST ===
+  - stage: BuildAndTest
+    displayName: 'Project: Build and Test'
+    dependsOn: PreBuild
+    condition: succeeded()
+    jobs:
+      - job: BuildAndTest
+        displayName: 'Build And Test'
+        steps:
+          - script: |
+              echo "== Compiling project =="
+              mkdir -p $(Build.ArtifactStagingDirectory)/build
+              echo "Compiled app binary" > $(Build.ArtifactStagingDirectory)/build/app.bin
+            displayName: 'Build Project'
 
-          # Шаг 4: Вычисление версии приложения
-          - task: Bash@3
-            name: CalculateAppVersion
-            inputs:
-              targetType: 'inline'
-              script: |
-                source $(Pipeline.Workspace)/ciTemplates/common-scripts/logging.sh
-                if [ -n "$(FORCED_VERSION)" ]; then
-                  info_msg "Using FORCED_VERSION: $(FORCED_VERSION)"
-                  echo "##vso[task.setvariable variable=APP_VERSION]$(FORCED_VERSION)"
-                else
-                  bash $(Pipeline.Workspace)/ciTemplates/common-scripts/dockerhub.sh "$(DOCKER_REPOSITORY)"
-                  info_msg "Calculated app version: $(APP_VERSION)"
-                fi
-            displayName: 'Calculate Application Version'
+          - task: PublishBuildArtifacts@1
+            inputs:
+              pathToPublish: '$(Build.ArtifactStagingDirectory)/build'
+              artifactName: 'build-artifact'
+              publishLocation: 'Container'
+            displayName: 'Publish Build Artifact'
 
-  # === STAGE 2: BUILD AND TEST ===
-  - stage: StageID_BuildAndTestProject
-    displayName: 'Project: Build and Test'
-    dependsOn: StageID_PreBuild
-    jobs:
-      - job: JobID_BuildAndTest
-        displayName: 'Build and Test'
-        steps:
-          - script: |
-              echo "Building project..."
-              # Здесь будет код для сборки вашего проекта (в зависимости от языка и структуры)
-            displayName: 'Build Project'
+          - script: |
+              echo "== Running Unit Tests =="
+              echo "Simulating unit tests..."
+              echo "All tests passed"
+            displayName: 'Run Unit Tests'
 
-          - script: |
-              echo "Running Unit Tests..."
-              # Здесь будет код для запуска unit тестов (например, для Node.js, Python, или .NET)
-            displayName: 'Run Unit Tests'
+  # === STAGE 3: DOCKER BUILD AND PUSH ===
+  - stage: DockerBuildAndPush
+    displayName: 'Docker: Build and Push'
+    dependsOn: BuildAndTest
+    condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'main'))
+    jobs:
+      - job: BuildAndPush
+        displayName: 'Build and Push'
+        steps:
+          - task: DownloadBuildArtifacts@0
+            inputs:
+              buildType: 'current'
+              downloadType: 'single'
+              artifactName: 'build-artifact'
+              downloadPath: '$(Pipeline.Workspace)/build'
+            displayName: 'Download Build Artifact'
 
-  # === STAGE 3: DOCKER BUILD AND PUSH ===
-  - stage: StageID_BuildAndPushDockerImage
-    displayName: 'Docker: Build and Push'
-    dependsOn: StageID_BuildAndTestProject
-    condition: eq(variables['Build.SourceBranchName'], 'main')
-    jobs:
-      - job: JobID_BuildAndPushDockerImage
-        displayName: 'Build and Push Docker Image'
-        steps:
-          # Шаг 1: Сборка Docker Image
-          - task: Docker@2
-            displayName: 'Build Docker Image'
-            inputs:
-              command: 'build'
-              repository: '$(DOCKER_REPOSITORY)'
-              Dockerfile: '**/Dockerfile'
-              tags: '$(APP_VERSION)'
+          - task: Docker@2
+            displayName: 'Build Docker Image'
+            inputs:
+              command: 'build'
+              Dockerfile: '**/Dockerfile'
+              tags: '$(Build.BuildId)'
+              buildContext: '$(Pipeline.Workspace)/build'
 
-          # Шаг 2: Сохранение Docker Image как артефакт
-          - task: PublishBuildArtifacts@1
-            displayName: 'Publish Docker Image Artifact'
-            inputs:
-              PathtoPublish: '$(Build.ArtifactStagingDirectory)/docker-image'
-              ArtifactName: 'docker-image'
-              publishLocation: 'Container'
+          - task: Docker@2
+            displayName: 'Push Docker Image'
+            inputs:
+              command: 'push'
+              tags: '$(Build.BuildId)'
 
-          # Шаг 3: Push Docker Image в Docker Hub
-          - task: Docker@2
-            displayName: 'Push Docker Image to Docker Hub'
-            inputs:
-              command: 'push'
-              repository: '$(DOCKER_REPOSITORY)'
-              tags: '$(APP_VERSION)'
+  # === STAGE 4: HELM CHART PACK ===
+  - stage: HelmChartPack
+    displayName: 'Helm Chart: Pack and Push'
+    dependsOn: DockerBuildAndPush
+    condition: succeeded()
+    jobs:
+      - job: PackAndPush
+        displayName: 'Pack and Push'
+        steps:
+          - script: |
+              echo "Packing and pushing Helm chart..."
+            displayName: 'Helm Chart Step'
 
-  # === STAGE 4: POST-BUILD ===
-  - stage: StageID_PostBuild
-    displayName: 'Post-Build'
-    dependsOn: StageID_BuildAndPushDockerImage
-    jobs:
-      - job: JobID_PostBuild
-        displayName: 'Post-Build'
-        steps:
-          - script: |
-              echo "Post-build actions complete"
-            displayName: 'Post-Build Step'
+  # === STAGE 5: POST-BUILD ===
+  - stage: PostBuild
+    displayName: 'Post-Build'
+    dependsOn: HelmChartPack
+    condition: succeeded()
+    jobs:
+      - job: PostBuild
+        displayName: 'Post-Build'
+        steps:
+          - script: |
+              echo "Post-build cleanup or report step"
+            displayName: 'Post-Build Step'
+
