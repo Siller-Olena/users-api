@@ -18,16 +18,17 @@ stages:
           - script: |
               echo "Hello, from Pre-Build Job"
             displayName: 'Pre-Build Step'
+
           - script: |
-            echo "Agent.TempDirectory: $(Agent.TempDirectory)"
-            echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
-            echo "Build.Repository.LocalPath: $(Build.Repository.LocalPath)"
-            echo "Build.Repository.Name: $(Build.Repository.Name)"
-            echo "Build.SourceBranch: $(Build.SourceBranch)"
-            echo "Build.SourceBranchName: $(Build.SourceBranchName)"
-            echo "Build.SourcesDirectory: $(Build.SourcesDirectory)"
-            echo "Build.StagingDirectory: $(Build.StagingDirectory)"
-          displayName: 'Print Azure DevOps Pipeline predefined variables'  
+              echo "Agent.TempDirectory: $(Agent.TempDirectory)"
+              echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
+              echo "Build.Repository.LocalPath: $(Build.Repository.LocalPath)"
+              echo "Build.Repository.Name: $(Build.Repository.Name)"
+              echo "Build.SourceBranch: $(Build.SourceBranch)"
+              echo "Build.SourceBranchName: $(Build.SourceBranchName)"
+              echo "Build.SourcesDirectory: $(Build.SourcesDirectory)"
+              echo "Build.StagingDirectory: $(Build.StagingDirectory)"
+            displayName: 'Print Azure DevOps Pipeline predefined variables'
 
   # === STAGE 2: BUILD AND TEST ===
   - stage: BuildAndTest
@@ -39,21 +40,54 @@ stages:
         displayName: 'Build And Test'
         steps:
           - script: |
-              echo "Hello, from Build and Test Job"
-            displayName: 'Build and Test Step'
+              echo "== Compiling project =="
+              mkdir -p $(Build.ArtifactStagingDirectory)/build
+              echo "Compiled app binary" > $(Build.ArtifactStagingDirectory)/build/app.bin
+            displayName: 'Build Project'
+
+          - task: PublishBuildArtifacts@1
+            inputs:
+              pathToPublish: '$(Build.ArtifactStagingDirectory)/build'
+              artifactName: 'build-artifact'
+              publishLocation: 'Container'
+            displayName: 'Publish Build Artifact'
+
+          - script: |
+              echo "== Running Unit Tests =="
+              echo "Simulating unit tests..."
+              echo "All tests passed"
+            displayName: 'Run Unit Tests'
 
   # === STAGE 3: DOCKER BUILD AND PUSH ===
   - stage: DockerBuildAndPush
     displayName: 'Docker: Build and Push'
     dependsOn: BuildAndTest
-    condition: succeeded()
+    condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'main'))
     jobs:
       - job: BuildAndPush
         displayName: 'Build and Push'
         steps:
-          - script: |
-              echo "Hello, from Docker Build and Push Job"
-            displayName: 'Docker Step'
+          - task: DownloadBuildArtifacts@0
+            inputs:
+              buildType: 'current'
+              downloadType: 'single'
+              artifactName: 'build-artifact'
+              downloadPath: '$(Pipeline.Workspace)/build'
+            displayName: 'Download Build Artifact'
+
+          - task: Docker@2
+            displayName: 'Build Docker Image'
+            inputs:
+              command: 'build'
+              Dockerfile: '**/Dockerfile'
+              tags: '$(Build.BuildId)'
+              buildContext: '$(Pipeline.Workspace)/build'
+
+          - task: Docker@2
+            displayName: 'Push Docker Image'
+            inputs:
+              command: 'push'
+              tags: '$(Build.BuildId)'
 
   # === STAGE 4: HELM CHART PACK ===
   - stage: HelmChartPack
@@ -65,7 +99,7 @@ stages:
         displayName: 'Pack and Push'
         steps:
           - script: |
-              echo "Hello, from Helm Chart Pack and Push Job"
+              echo "Packing and pushing Helm chart..."
             displayName: 'Helm Chart Step'
 
   # === STAGE 5: POST-BUILD ===
@@ -78,8 +112,9 @@ stages:
         displayName: 'Post-Build'
         steps:
           - script: |
-              echo "Hello, from Post-Build Job"
+              echo "Post-build cleanup or report step"
             displayName: 'Post-Build Step'
+
 
 
 
