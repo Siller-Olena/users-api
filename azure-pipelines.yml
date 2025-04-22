@@ -7,23 +7,12 @@ trigger:
 pool:
   vmImage: 'ubuntu-latest'
 
-resources:
-  repositories:
-    - repository: user-api
-      type: git
-      name: olenasiller
-
-parameters:
-  - name: FORCED_VERSION
-    default: ''
-
 variables:
   - group: docker-settings
-  - name: FORCED_VERSION
-    value: ${{ parameters.FORCED_VERSION }}
+  - name: olenasiller
+    value: '1.0.0'
 
 stages:
-
   - stage: PreBuild
     displayName: 'Pre-Build'
     jobs:
@@ -31,40 +20,10 @@ stages:
         displayName: 'Pre-Build Analysis'
         steps:
           - checkout: self
-            fetchDepth: 0
             persistCredentials: true
 
-          - checkout: ciTemplates
-            fetchDepth: 0
-            persistCredentials: true
-
-          - task: Bash@3
-            name: HelloStep
-            inputs:
-              targetType: 'inline'
-              script: echo "Hello, from Pre-Build Job"
-
-          - task: Bash@3
-            name: PrintVariables
-            inputs:
-              targetType: 'inline'
-              script: |
-                echo "Agent.TempDirectory: $(Agent.TempDirectory)"
-                echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
-                echo "Build.Repository.LocalPath: $(Build.Repository.LocalPath)"
-                echo "Build.SourceBranchName: $(Build.SourceBranchName)"
-
-          - task: Bash@3
-            name: CalculateAppVersion
-            inputs:
-              targetType: 'inline'
-              script: |
-                if [ -n "$(FORCED_VERSION)" ]; then
-                  echo "Using FORCED_VERSION: $(FORCED_VERSION)"
-                  echo "##vso[task.setvariable variable=APP_VERSION]$(FORCED_VERSION)"
-                else
-                  echo "##vso[task.setvariable variable=APP_VERSION]1.0.$(Build.BuildId)"
-                fi
+          - script: echo "✅ Pre-build: ok"
+            displayName: 'Pre-build Hello'
 
   - stage: BuildAndTest
     displayName: 'Project: Build and Test'
@@ -72,82 +31,59 @@ stages:
     condition: succeeded()
     jobs:
       - job: BuildAndTest
-        displayName: 'Build and Test'
+        displayName: 'Build and Unit Tests'
         steps:
           - script: |
-              echo "🔧 Building the project..."
+              echo "🔨 Building the project..."
               make build
-            displayName: 'Build project'
+            displayName: 'Build'
 
           - script: |
-              echo "🧪 Running unit tests..."
+              echo "🧪 Running Unit Tests..."
               make test
-            displayName: 'Run unit tests'
+            displayName: 'Unit Tests'
 
-          - task: PublishPipelineArtifact@1
-            displayName: 'Publish build artifact'
+          - task: PublishBuildArtifacts@1
             inputs:
-              targetPath: '$(Build.ArtifactStagingDirectory)'
-              artifact: 'build-artifacts'
+              pathToPublish: 'bin'
+              artifactName: 'build-artifacts'
+              publishLocation: 'Container'
+            displayName: '📦 Publish Build Artifacts'
 
   - stage: DockerBuildAndPush
     displayName: 'Docker: Build and Push'
     dependsOn: BuildAndTest
     condition: eq(variables['Build.SourceBranchName'], 'main')
     jobs:
-      - job: BuildAndPush
-        displayName: 'Build and Push Docker'
+      - job: DockerBuild
+        displayName: 'Build Docker Image'
         steps:
-          - script: |
-              echo "🐳 Building Docker image..."
-              docker build -t $(DOCKER_REPOSITORY):$(APP_VERSION) .
-            displayName: 'Docker build'
-
-          - script: |
-              echo "📦 Saving Docker image to tar..."
-              mkdir -p $(Build.ArtifactStagingDirectory)/docker
-              docker save -o $(Build.ArtifactStagingDirectory)/docker/image.tar $(DOCKER_REPOSITORY):$(APP_VERSION)
-            displayName: 'Save Docker image'
-
-          - task: PublishPipelineArtifact@1
-            inputs:
-              targetPath: '$(Build.ArtifactStagingDirectory)/docker'
-              artifact: 'docker-image'
-            displayName: 'Publish Docker artifact'
-
           - task: Docker@2
             inputs:
-              command: login
-              containerRegistry: 'DockerHubServiceConnection'
+              command: build
+              Dockerfile: 'Dockerfile'
+              tags: |
+                $(DOCKER_REGISTRY)/$(DOCKER_REPOSITORY):$(FORCED_VERSION)
+            displayName: '🐳 Docker Build'
 
+          - task: PublishBuildArtifacts@1
+            inputs:
+              pathToPublish: '$(Pipeline.Workspace)'
+              artifactName: 'docker-image-files'
+              publishLocation: 'Container'
+            displayName: '📦 Save Docker Image Files (optional)'
+
+      - job: DockerPush
+        displayName: 'Push Docker Image'
+        dependsOn: DockerBuild
+        steps:
           - task: Docker@2
             inputs:
               command: push
-              repository: $(DOCKER_REPOSITORY)
               tags: |
-                $(APP_VERSION)
+                $(DOCKER_REGISTRY)/$(DOCKER_REPOSITORY):$(FORCED_VERSION)
+            displayName: '📤 Push Docker Image'
 
-  - stage: HelmChartPack
-    displayName: 'Helm Chart: Pack and Push'
-    dependsOn: DockerBuildAndPush
-    condition: succeeded()
-    jobs:
-      - job: PackAndPush
-        displayName: 'Helm Chart Step'
-        steps:
-          - script: echo "📦 Helm chart packaging (stub)"
-            displayName: 'Helm Chart packaging'
-
-  - stage: PostBuild
-    displayName: 'Post-Build'
-    dependsOn: HelmChartPack
-    condition: succeeded()
-    jobs:
-      - job: PostBuild
-        displayName: 'Post-Build'
-        steps:
-          - script: echo "🎉 Pipeline completed"
-            displayName: 'Final step'
 
 
 
