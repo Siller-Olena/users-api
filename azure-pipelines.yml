@@ -10,121 +10,98 @@ pool:
 variables:
   dockerRepo: 'sillerolena/lab4'
   serviceName: 'sillerolena'
-  appVersion: ' '
+  appVersion: 'latest'  # або встановлюй з git tag чи змінної
 
-stages:
-  # 🔹 PreBuild Stage (без змін)
-  - stage: PreBuild
-    displayName: 'Pre-Build'
-    jobs:
-      - job: PreBuildAnalysis
-        displayName: 'Pre-Build Analysis'
-        steps:
-          - script: |
-              echo "Hello, from Pre-Build Job"
-            displayName: 'Pre-Build Step'
+# 🔹 Stage A: PreBuild
+- stage: StageID_PreBuild
+  displayName: 'Pre-Build'
+  jobs:
+    - job: JobID_PreBuildAnalysis
+      displayName: 'Pre-Build Analysis'
+      steps:
+        - script: echo "Hello from PreBuild!"
+          displayName: 'Say Hello'
+        - script: |
+            echo "Repository: $(Build.Repository.Name)"
+            echo "Branch: $(Build.SourceBranchName)"
+          displayName: 'Print Info'
 
-          - script: |
-              echo "Agent.TempDirectory: $(Agent.TempDirectory)"
-              echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
-              echo "Build.Repository.LocalPath: $(Build.Repository.LocalPath)"
-              echo "Build.Repository.Name: $(Build.Repository.Name)"
-              echo "Build.SourceBranch: $(Build.SourceBranch)"
-              echo "Build.SourceBranchName: $(Build.SourceBranchName)"
-              echo "Build.SourcesDirectory: $(Build.SourcesDirectory)"
-              echo "Build.StagingDirectory: $(Build.StagingDirectory)"
-            displayName: 'Print Azure DevOps Pipeline predefined variables'
+# 🔸 Stage B: Build and Test
+- stage: StageID_BuildAndTestProject
+  displayName: 'Project: Build and Test'
+  dependsOn: StageID_PreBuild
+  jobs:
+    - job: JobID_BuildAndTest
+      displayName: 'Build and Test'
+      steps:
+        - script: |
+            echo "🔧 Building the project..."
+            make build
+          displayName: 'Б1: Build service'
 
-  # 🔸 Завдання Б1-Б2: Build and Test Stage
-  - stage: BuildAndTest
-    displayName: 'Project: Build and Test'
-    dependsOn: PreBuild
-    condition: succeeded()
-    jobs:
-      - job: BuildAndTest
-        displayName: 'Build And Test'
-        steps:
-          - script: |
-              echo "🔧 Building the project..."
-              make build
-            displayName: 'Task Б1: Build project'
+        - script: |
+            echo "🧪 Running unit tests..."
+            make test
+          displayName: 'Б2: Run unit tests'
 
-          - script: |
-              echo "🧪 Running unit tests..."
-              make test
-            displayName: 'Task Б2: Run unit tests'
+        - task: PublishPipelineArtifact@1
+          displayName: 'Publish Build Artifacts'
+          inputs:
+            targetPath: '$(Build.ArtifactStagingDirectory)'
+            artifact: 'build-artifacts'
+            publishLocation: 'pipeline'
 
-          - task: PublishPipelineArtifact@1
-            displayName: 'Publish Build Artifacts'
-            inputs:
-              targetPath: '$(Build.ArtifactStagingDirectory)'
-              artifact: 'build-artifacts'
-              publishLocation: 'pipeline'
+# 🔸 Stage C: Docker Build & Push
+- stage: StageID_BuildAndPushDockerImage
+  displayName: 'Docker: Build and Push'
+  dependsOn: StageID_BuildAndTestProject
+  condition: eq(variables['Build.SourceBranchName'], 'main')  # Г1
+  jobs:
+    - job: JobID_BuildAndPushDockerImage
+      displayName: 'Build and Push'
+      steps:
+        - script: |
+            echo "🐳 Building Docker image..."
+            docker build -t $(dockerRepo)/$(serviceName):$(appVersion) .
+          displayName: 'В1: Docker build'
 
-  # 🔸 Завдання В1-В2 + Г1-Г2: Docker Build & Push
-  - stage: DockerBuildAndPush
-    displayName: 'Docker: Build and Push'
-    dependsOn: BuildAndTest
-    condition: eq(variables['Build.SourceBranchName'], 'main') # Г1: Тільки для main
-    jobs:
-      - job: BuildAndPush
-        displayName: 'Build and Push'
-        steps:
-          - script: |
-              echo "🐳 Building Docker image..."
-              docker build -t $(dockerRepo)/$(serviceName):$(appVersion) .
-            displayName: 'Task В1: Docker build'
+        - script: |
+            echo "📦 Saving Docker image..."
+            mkdir -p $(Build.ArtifactStagingDirectory)/docker
+            docker save -o $(Build.ArtifactStagingDirectory)/docker/$(serviceName)_$(appVersion).tar $(dockerRepo)/$(serviceName):$(appVersion)
+          displayName: 'В2: Save image to artifact'
 
-          - script: |
-              echo "📦 Saving Docker image to tar file..."
-              mkdir -p $(Build.ArtifactStagingDirectory)/docker
-              docker save -o $(Build.ArtifactStagingDirectory)/docker/$(serviceName)_$(appVersion).tar $(dockerRepo)/$(serviceName):$(appVersion)
-            displayName: 'Task В2: Save image as artifact'
+        - task: PublishPipelineArtifact@1
+          displayName: 'Publish Docker Image Artifact'
+          inputs:
+            targetPath: '$(Build.ArtifactStagingDirectory)/docker'
+            artifact: 'docker-image'
 
-          - task: PublishPipelineArtifact@1
-            displayName: 'Publish Docker image artifact'
-            inputs:
-              targetPath: '$(Build.ArtifactStagingDirectory)/docker'
-              artifact: 'docker-image'
+        - task: Docker@2
+          displayName: 'Г2: Docker Login'
+          inputs:
+            command: login
+            containerRegistry: 'DockerHubServiceConnection'  # Заздалегідь створене з'єднання
 
-          - task: Docker@2
-            displayName: 'Task Г2: Docker Login'
-            inputs:
-              command: login
-              containerRegistry: 'DockerHubServiceConnection' # 🔐 Задається в Azure DevOps як service connection
+        - task: Docker@2
+          displayName: 'Г2: Push Docker Image'
+          inputs:
+            command: push
+            repository: '$(dockerRepo)/$(serviceName)'
+            tags: |
+              $(appVersion)
 
-          - task: Docker@2
-            displayName: 'Task Г2: Push Docker Image'
-            inputs:
-              command: push
-              repository: '$(dockerRepo)/$(serviceName)'
-              tags: |
-                $(appVersion)
+# ✅ Stage D: Post Build
+- stage: StageID_PostBuild
+  displayName: 'Post-Build'
+  dependsOn: StageID_BuildAndPushDockerImage
+  condition: succeeded()
+  jobs:
+    - job: JobID_PostBuild
+      displayName: 'Post-Build'
+      steps:
+        - script: echo "🎉 Pipeline completed successfully"
+          displayName: 'Post Build Message'
 
-  # 🧵 Helm Chart Stage (залишаємо базовим)
-  - stage: HelmChartPack
-    displayName: 'Helm Chart: Pack and Push'
-    dependsOn: DockerBuildAndPush
-    condition: succeeded()
-    jobs:
-      - job: PackAndPush
-        displayName: 'Pack and Push'
-        steps:
-          - script: |
-              echo "📦 Helm chart packaging (поки заглушка)"
-            displayName: 'Helm Chart Step'
-
-  # ✅ Post Build (фінальна частина)
-  - stage: PostBuild
-    displayName: 'Post-Build'
-    dependsOn: HelmChartPack
-    condition: succeeded()
-    jobs:
-      - job: PostBuild
-        displayName: 'Post-Build'
-        steps:
-          - script: |
-              echo "🎉 Pipeline completed successfully"
-            displayName: 'Post-Build Step'
 
 
