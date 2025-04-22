@@ -9,9 +9,9 @@ pool:
 
 resources:
   repositories:
-    - repository: ciTemplates
+    - repository: user-api
       type: git
-      name: ProjectName/ci-templates  # заміни на реальне ім’я
+      name: olenasiller
 
 parameters:
   - name: FORCED_VERSION
