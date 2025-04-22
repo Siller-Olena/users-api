@@ -1,0 +1,52 @@
+#!/bin/bash
+
+# Функція перевірки наявності файла
+check_file_exists() {
+    local filename="$1"
+    if [ ! -f "$filename" ]; then
+        return 1  # не існує
+    else
+        return 0  # існує
+    fi
+}
+
+# Функція читання імен з файла у масив
+read_names_from_file() {
+    local filename="$1"
+    local -n names_array=$2  # використання іменованої передачі масиву (Bash 4+)
+    names_array=()
+    while IFS= read -r name; do
+        names_array+=("$name")
+    done < "$filename"
+}
+
+# Старт програми
+read -p "Введи ім'я файлу: " filename
+
+# Перевірка наявності файлу
+if ! check_file_exists "$filename"; then
+    echo "Помилка: файл '$filename' не знайдено!"
+    exit 1
+fi
+
+# Читання імен
+read_names_from_file "$filename" names
+
+echo " Імена з файлу:"
+for name in "${names[@]}"; do
+    echo "- $name"
+done
+
+# Додавання нового імені
+read -p "Введи нове ім'я для додавання: " new_name
+
+# Перевірка на порожнє значення
+if [ -z "$new_name" ]; then
+    echo "Ім’я не може бути порожнім!"
+    exit 1
+fi
+
+echo "$new_name" >> "$filename"
+echo "Ім'я '$new_name' додано до файлу '$filename'"
+
+echo "Завершення скрипта."
