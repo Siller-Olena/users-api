@@ -4,9 +4,9 @@
 check_file_exists() {
     local filename="$1"
     if [ ! -f "$filename" ]; then
-        return 1  # не існує
+        return 1  # файл не існує
     else
-        return 0  # існує
+        return 0  # файл існує
     fi
 }
 
@@ -21,7 +21,7 @@ read_names_from_file() {
 }
 
 # Старт програми
-read -p "Введи ім'я файлу: " filename
+filename="names.txt"  # Оскільки ми вже знаємо ім'я файлу, можна вказати його прямо тут
 
 # Перевірка наявності файлу
 if ! check_file_exists "$filename"; then
@@ -29,10 +29,11 @@ if ! check_file_exists "$filename"; then
     exit 1
 fi
 
-# Читання імен
+# Читання імен з файлу
 read_names_from_file "$filename" names
 
-echo " Імена з файлу:"
+# Виведення імен з файлу
+echo "Імена з файлу:"
 for name in "${names[@]}"; do
     echo "- $name"
 done
@@ -46,7 +47,9 @@ if [ -z "$new_name" ]; then
     exit 1
 fi
 
+# Додавання імені в файл
 echo "$new_name" >> "$filename"
 echo "Ім'я '$new_name' додано до файлу '$filename'"
 
 echo "Завершення скрипта."
+
