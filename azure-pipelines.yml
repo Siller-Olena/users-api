@@ -11,16 +11,12 @@ resources:
   repositories:
     - repository: ciTemplates
       type: git
-      name: ProjectName/ci-templates  # Замените на вашу реальную назву
-
-parameters:
-  - name: FORCED_VERSION
-    default: ''
+      name: ProjectName/ci-templates  # Замените на реальную ссылку на репозиторий
 
 variables:
   - group: docker-settings
   - name: FORCED_VERSION
-    value: ${{ parameters.FORCED_VERSION }}
+    value: ''
 
 stages:
   # === STAGE 1: PRE-BUILD ===
@@ -133,9 +129,3 @@ stages:
           - script: |
               echo "Post-build actions complete"
             displayName: 'Post-Build Step'
-
-
-
-
-
-
