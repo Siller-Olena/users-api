@@ -7,82 +7,79 @@ trigger:
 pool:
   vmImage: 'ubuntu-latest'
 
-variables:
-  - group: docker-settings
-  - name: olenasiller
-    value: '1.0.0'
-
 stages:
+  # === STAGE 1: PRE-BUILD ===
   - stage: PreBuild
     displayName: 'Pre-Build'
     jobs:
       - job: PreBuildAnalysis
         displayName: 'Pre-Build Analysis'
         steps:
-          - checkout: self
-            persistCredentials: true
+          - script: |
+              echo "Hello, from Pre-Build Job"
+            displayName: 'Pre-Build Step'
+          - script: |
+            echo "Agent.TempDirectory: $(Agent.TempDirectory)"
+            echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
+            echo "Build.Repository.LocalPath: $(Build.Repository.LocalPath)"
+            echo "Build.Repository.Name: $(Build.Repository.Name)"
+            echo "Build.SourceBranch: $(Build.SourceBranch)"
+            echo "Build.SourceBranchName: $(Build.SourceBranchName)"
+            echo "Build.SourcesDirectory: $(Build.SourcesDirectory)"
+            echo "Build.StagingDirectory: $(Build.StagingDirectory)"
+          displayName: 'Print Azure DevOps Pipeline predefined variables'  
 
-          - script: echo "✅ Pre-build: ok"
-            displayName: 'Pre-build Hello'
-
+  # === STAGE 2: BUILD AND TEST ===
   - stage: BuildAndTest
     displayName: 'Project: Build and Test'
     dependsOn: PreBuild
     condition: succeeded()
     jobs:
       - job: BuildAndTest
-        displayName: 'Build and Unit Tests'
+        displayName: 'Build And Test'
         steps:
           - script: |
-              echo "🔨 Building the project..."
-              make build
-            displayName: 'Build'
+              echo "Hello, from Build and Test Job"
+            displayName: 'Build and Test Step'
 
-          - script: |
-              echo "🧪 Running Unit Tests..."
-              make test
-            displayName: 'Unit Tests'
-
-          - task: PublishBuildArtifacts@1
-            inputs:
-              pathToPublish: 'bin'
-              artifactName: 'build-artifacts'
-              publishLocation: 'Container'
-            displayName: '📦 Publish Build Artifacts'
-
+  # === STAGE 3: DOCKER BUILD AND PUSH ===
   - stage: DockerBuildAndPush
     displayName: 'Docker: Build and Push'
     dependsOn: BuildAndTest
-    condition: eq(variables['Build.SourceBranchName'], 'main')
+    condition: succeeded()
     jobs:
-      - job: DockerBuild
-        displayName: 'Build Docker Image'
+      - job: BuildAndPush
+        displayName: 'Build and Push'
         steps:
-          - task: Docker@2
-            inputs:
-              command: build
-              Dockerfile: 'Dockerfile'
-              tags: |
-                $(DOCKER_REGISTRY)/$(DOCKER_REPOSITORY):$(FORCED_VERSION)
-            displayName: '🐳 Docker Build'
+          - script: |
+              echo "Hello, from Docker Build and Push Job"
+            displayName: 'Docker Step'
 
-          - task: PublishBuildArtifacts@1
-            inputs:
-              pathToPublish: '$(Pipeline.Workspace)'
-              artifactName: 'docker-image-files'
-              publishLocation: 'Container'
-            displayName: '📦 Save Docker Image Files (optional)'
-
-      - job: DockerPush
-        displayName: 'Push Docker Image'
-        dependsOn: DockerBuild
+  # === STAGE 4: HELM CHART PACK ===
+  - stage: HelmChartPack
+    displayName: 'Helm Chart: Pack and Push'
+    dependsOn: DockerBuildAndPush
+    condition: succeeded()
+    jobs:
+      - job: PackAndPush
+        displayName: 'Pack and Push'
         steps:
-          - task: Docker@2
-            inputs:
-              command: push
-              tags: |
-                $(DOCKER_REGISTRY)/$(DOCKER_REPOSITORY):$(FORCED_VERSION)
-            displayName: '📤 Push Docker Image'
+          - script: |
+              echo "Hello, from Helm Chart Pack and Push Job"
+            displayName: 'Helm Chart Step'
+
+  # === STAGE 5: POST-BUILD ===
+  - stage: PostBuild
+    displayName: 'Post-Build'
+    dependsOn: HelmChartPack
+    condition: succeeded()
+    jobs:
+      - job: PostBuild
+        displayName: 'Post-Build'
+        steps:
+          - script: |
+              echo "Hello, from Post-Build Job"
+            displayName: 'Post-Build Step'
 
 
 
