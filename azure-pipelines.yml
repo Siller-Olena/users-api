@@ -11,7 +11,7 @@ resources:
   repositories:
     - repository: ciTemplates
       type: git
-      name: ProjectName/ci-templates  # Заміни на свою назву
+      name: ProjectName/ci-templates  # заміни на реальне ім’я
 
 parameters:
   - name: FORCED_VERSION
@@ -23,6 +23,7 @@ variables:
     value: ${{ parameters.FORCED_VERSION }}
 
 stages:
+
   - stage: PreBuild
     displayName: 'Pre-Build'
     jobs:
@@ -32,45 +33,37 @@ stages:
           - checkout: self
             fetchDepth: 0
             persistCredentials: true
-            
-          - checkout: ci-common-Templates
-             fetchDepth: 0
+
+          - checkout: ciTemplates
+            fetchDepth: 0
             persistCredentials: true
-            
+
           - task: Bash@3
             name: HelloStep
             inputs:
               targetType: 'inline'
-              script: |
-                echo "Hello, from Pre-Build Job"
+              script: echo "Hello, from Pre-Build Job"
 
           - task: Bash@3
             name: PrintVariables
             inputs:
               targetType: 'inline'
               script: |
-                source $(Pipeline.Workspace)/ciTemplates/common-scripts/logging.sh
-                info_msg "Agent.TempDirectory: $(Agent.TempDirectory)"
-                info_msg "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
-                info_msg "Build.Repository.LocalPath: $(Build.Repository.LocalPath)"
-                info_msg "Build.Repository.Name: $(Build.Repository.Name)"
-                info_msg "Build.SourceBranch: $(Build.SourceBranch)"
-                info_msg "Build.SourceBranchName: $(Build.SourceBranchName)"
-                info_msg "Build.SourcesDirectory: $(Build.SourcesDirectory)"
-                info_msg "Build.StagingDirectory: $(Build.StagingDirectory)"
+                echo "Agent.TempDirectory: $(Agent.TempDirectory)"
+                echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
+                echo "Build.Repository.LocalPath: $(Build.Repository.LocalPath)"
+                echo "Build.SourceBranchName: $(Build.SourceBranchName)"
 
           - task: Bash@3
             name: CalculateAppVersion
             inputs:
               targetType: 'inline'
               script: |
-                source $(Pipeline.Workspace)/ciTemplates/common-scripts/logging.sh
-
                 if [ -n "$(FORCED_VERSION)" ]; then
-                  info_msg "Using FORCED_VERSION: $(FORCED_VERSION)"
+                  echo "Using FORCED_VERSION: $(FORCED_VERSION)"
                   echo "##vso[task.setvariable variable=APP_VERSION]$(FORCED_VERSION)"
                 else
-                  bash $(Pipeline.Workspace)/ciTemplates/common-scripts/dockerhub.sh "$(DOCKER_REPOSITORY)"
+                  echo "##vso[task.setvariable variable=APP_VERSION]1.0.$(Build.BuildId)"
                 fi
 
   - stage: BuildAndTest
@@ -79,23 +72,60 @@ stages:
     condition: succeeded()
     jobs:
       - job: BuildAndTest
-        displayName: 'Build And Test'
+        displayName: 'Build and Test'
         steps:
           - script: |
-              echo "Hello, from Build and Test Job"
-            displayName: 'Build and Test Step'
+              echo "🔧 Building the project..."
+              make build
+            displayName: 'Build project'
+
+          - script: |
+              echo "🧪 Running unit tests..."
+              make test
+            displayName: 'Run unit tests'
+
+          - task: PublishPipelineArtifact@1
+            displayName: 'Publish build artifact'
+            inputs:
+              targetPath: '$(Build.ArtifactStagingDirectory)'
+              artifact: 'build-artifacts'
 
   - stage: DockerBuildAndPush
     displayName: 'Docker: Build and Push'
     dependsOn: BuildAndTest
-    condition: succeeded()
+    condition: eq(variables['Build.SourceBranchName'], 'main')
     jobs:
       - job: BuildAndPush
-        displayName: 'Build and Push'
+        displayName: 'Build and Push Docker'
         steps:
           - script: |
-              echo "Hello, from Docker Build and Push Job"
-            displayName: 'Docker Step'
+              echo "🐳 Building Docker image..."
+              docker build -t $(DOCKER_REPOSITORY):$(APP_VERSION) .
+            displayName: 'Docker build'
+
+          - script: |
+              echo "📦 Saving Docker image to tar..."
+              mkdir -p $(Build.ArtifactStagingDirectory)/docker
+              docker save -o $(Build.ArtifactStagingDirectory)/docker/image.tar $(DOCKER_REPOSITORY):$(APP_VERSION)
+            displayName: 'Save Docker image'
+
+          - task: PublishPipelineArtifact@1
+            inputs:
+              targetPath: '$(Build.ArtifactStagingDirectory)/docker'
+              artifact: 'docker-image'
+            displayName: 'Publish Docker artifact'
+
+          - task: Docker@2
+            inputs:
+              command: login
+              containerRegistry: 'DockerHubServiceConnection'
+
+          - task: Docker@2
+            inputs:
+              command: push
+              repository: $(DOCKER_REPOSITORY)
+              tags: |
+                $(APP_VERSION)
 
   - stage: HelmChartPack
     displayName: 'Helm Chart: Pack and Push'
@@ -103,11 +133,10 @@ stages:
     condition: succeeded()
     jobs:
       - job: PackAndPush
-        displayName: 'Pack and Push'
+        displayName: 'Helm Chart Step'
         steps:
-          - script: |
-              echo "Hello, from Helm Chart Pack and Push Job"
-            displayName: 'Helm Chart Step'
+          - script: echo "📦 Helm chart packaging (stub)"
+            displayName: 'Helm Chart packaging'
 
   - stage: PostBuild
     displayName: 'Post-Build'
@@ -117,8 +146,8 @@ stages:
       - job: PostBuild
         displayName: 'Post-Build'
         steps:
-          - script: |
-              echo "Hello, from Post-Build Job"
-            displayName: 'Post-Build Step'
+          - script: echo "🎉 Pipeline completed"
+            displayName: 'Final step'
+
 
 
