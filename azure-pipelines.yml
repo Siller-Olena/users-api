@@ -1,117 +1,118 @@
 trigger:
-  branches:
-    include:
-      - main
-      - feature/*
+  branches:
+    include:
+      - main
+      - feature/*
 
 pool:
-  vmImage: 'ubuntu-latest'
+  vmImage: 'ubuntu-latest'
 
 stages:
-  # === STAGE 1: PRE-BUILD ===
-  - stage: PreBuild
-    displayName: 'Pre-Build'
-    jobs:
-      - job: PreBuildAnalysis
-        displayName: 'Pre-Build Analysis'
-        steps:
-          - script: |
-              echo "Hello, from Pre-Build Job"
-            displayName: 'Pre-Build Step'
+  # === STAGE 1: PRE-BUILD ===
+  - stage: PreBuild
+    displayName: 'Pre-Build'
+    jobs:
+      - job: PreBuildAnalysis
+        displayName: 'Pre-Build Analysis'
+        steps:
+          - script: |
+              echo "Hello, from Pre-Build Job"
+            displayName: 'Pre-Build Step'
 
-          - script: |
-              echo "Agent.TempDirectory: $(Agent.TempDirectory)"
-              echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
-              echo "Build.Repository.LocalPath: $(Build.Repository.LocalPath)"
-              echo "Build.Repository.Name: $(Build.Repository.Name)"
-              echo "Build.SourceBranch: $(Build.SourceBranch)"
-              echo "Build.SourceBranchName: $(Build.SourceBranchName)"
-              echo "Build.SourcesDirectory: $(Build.SourcesDirectory)"
-              echo "Build.StagingDirectory: $(Build.StagingDirectory)"
-            displayName: 'Print Azure DevOps Pipeline predefined variables'
+          - script: |
+              echo "Agent.TempDirectory: $(Agent.TempDirectory)"
+              echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
+              echo "Build.Repository.LocalPath: $(Build.Repository.LocalPath)"
+              echo "Build.Repository.Name: $(Build.Repository.Name)"
+              echo "Build.SourceBranch: $(Build.SourceBranch)"
+              echo "Build.SourceBranchName: $(Build.SourceBranchName)"
+              echo "Build.SourcesDirectory: $(Build.SourcesDirectory)"
+              echo "Build.StagingDirectory: $(Build.StagingDirectory)"
+            displayName: 'Print Azure DevOps Pipeline predefined variables'
 
-  # === STAGE 2: BUILD AND TEST ===
-  - stage: BuildAndTest
-    displayName: 'Project: Build and Test'
-    dependsOn: PreBuild
-    condition: succeeded()
-    jobs:
-      - job: BuildAndTest
-        displayName: 'Build And Test'
-        steps:
-          - script: |
-              echo "== Compiling project =="
-              mkdir -p $(Build.ArtifactStagingDirectory)/build
-              echo "Compiled app binary" > $(Build.ArtifactStagingDirectory)/build/app.bin
-            displayName: 'Build Project'
+  # === STAGE 2: BUILD AND TEST ===
+  - stage: BuildAndTest
+    displayName: 'Project: Build and Test'
+    dependsOn: PreBuild
+    condition: succeeded()
+    jobs:
+      - job: BuildAndTest
+        displayName: 'Build And Test'
+        steps:
+          - script: |
+              echo "== Compiling project =="
+              mkdir -p $(Build.ArtifactStagingDirectory)/build
+              echo "Compiled app binary" > $(Build.ArtifactStagingDirectory)/build/app.bin
+            displayName: 'Build Project'
 
-          - task: PublishBuildArtifacts@1
-            inputs:
-              pathToPublish: '$(Build.ArtifactStagingDirectory)/build'
-              artifactName: 'build-artifact'
-              publishLocation: 'Container'
-            displayName: 'Publish Build Artifact'
+          - task: PublishBuildArtifacts@1
+            inputs:
+              pathToPublish: '$(Build.ArtifactStagingDirectory)/build'
+              artifactName: 'build-artifact'
+              publishLocation: 'Container'
+            displayName: 'Publish Build Artifact'
 
-          - script: |
-              echo "== Running Unit Tests =="
-              echo "Simulating unit tests..."
-              echo "All tests passed"
-            displayName: 'Run Unit Tests'
+          - script: |
+              echo "== Running Unit Tests =="
+              echo "Simulating unit tests..."
+              echo "All tests passed"
+            displayName: 'Run Unit Tests'
 
-  # === STAGE 3: DOCKER BUILD AND PUSH ===
-  - stage: DockerBuildAndPush
-    displayName: 'Docker: Build and Push'
-    dependsOn: BuildAndTest
-    condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'main'))
-    jobs:
-      - job: BuildAndPush
-        displayName: 'Build and Push'
-        steps:
-          - task: DownloadBuildArtifacts@0
-            inputs:
-              buildType: 'current'
-              downloadType: 'single'
-              artifactName: 'build-artifact'
-              downloadPath: '$(Pipeline.Workspace)/build'
-            displayName: 'Download Build Artifact'
+  # === STAGE 3: DOCKER BUILD AND PUSH ===
+  - stage: DockerBuildAndPush
+    displayName: 'Docker: Build and Push'
+    dependsOn: BuildAndTest
+    condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'main'))
+    jobs:
+      - job: BuildAndPush
+        displayName: 'Build and Push'
+        steps:
+          - task: DownloadBuildArtifacts@0
+            inputs:
+              buildType: 'current'
+              downloadType: 'single'
+              artifactName: 'build-artifact'
+              downloadPath: '$(Pipeline.Workspace)/build'
+            displayName: 'Download Build Artifact'
 
-          - task: Docker@2
-            displayName: 'Build Docker Image'
-            inputs:
-              command: 'build'
-              Dockerfile: '**/Dockerfile'
-              tags: '$(Build.BuildId)'
-              buildContext: '$(Pipeline.Workspace)/build'
+          - task: Docker@2
+            displayName: 'Build Docker Image'
+            inputs:
+              command: 'build'
+              Dockerfile: '**/Dockerfile'
+              tags: '$(Build.BuildId)'
+              buildContext: '$(Pipeline.Workspace)/build'
 
-          - task: Docker@2
-            displayName: 'Push Docker Image'
-            inputs:
-              command: 'push'
-              tags: '$(Build.BuildId)'
+          - task: Docker@2
+            displayName: 'Push Docker Image'
+            inputs:
+              command: 'push'
+              tags: '$(Build.BuildId)'
 
-  # === STAGE 4: HELM CHART PACK ===
-  - stage: HelmChartPack
-    displayName: 'Helm Chart: Pack and Push'
-    dependsOn: DockerBuildAndPush
-    condition: succeeded()
-    jobs:
-      - job: PackAndPush
-        displayName: 'Pack and Push'
-        steps:
-          - script: |
-              echo "Packing and pushing Helm chart..."
-            displayName: 'Helm Chart Step'
+  # === STAGE 4: HELM CHART PACK ===
+  - stage: HelmChartPack
+    displayName: 'Helm Chart: Pack and Push'
+    dependsOn: DockerBuildAndPush
+    condition: succeeded()
+    jobs:
+      - job: PackAndPush
+        displayName: 'Pack and Push'
+        steps:
+          - script: |
+              echo "Packing and pushing Helm chart..."
+            displayName: 'Helm Chart Step'
 
-  # === STAGE 5: POST-BUILD ===
-  - stage: PostBuild
-    displayName: 'Post-Build'
-    dependsOn: HelmChartPack
-    condition: succeeded()
-    jobs:
-      - job: PostBuild
-        displayName: 'Post-Build'
-        steps:
-          - script: |
-              echo "Post-build cleanup or report step"
-            displayName: 'Post-Build Step'
+  # === STAGE 5: POST-BUILD ===
+  - stage: PostBuild
+    displayName: 'Post-Build'
+    dependsOn: HelmChartPack
+    condition: succeeded()
+    jobs:
+      - job: PostBuild
+        displayName: 'Post-Build'
+        steps:
+          - script: |
+              echo "Post-build cleanup or report step"
+            displayName: 'Post-Build Step'
+
 
