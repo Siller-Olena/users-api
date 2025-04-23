@@ -5,15 +5,15 @@ trigger:
       - feature/*
 
 variables: 
-  - group: 'DockerCredentials'
+  - group: DockerCredentials
   - name: DockerId
-    value: "$(DOCKER_ID)"
+    value: $(DOCKER_ID)
   - name: DockerToken
-    value: "$(DOCKER_TOKEN)"
+    value: $(DOCKER_TOKEN)
   - name: DockerRepo
-    value: "$(DOCKER_REPO)"
+    value: $(DOCKER_REPO)
   - name: ServiceName
-    value: "$(SERVICE_NAME)"
+    value: $(SERVICE_NAME)
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -22,167 +22,167 @@ resources:
   repositories:
     - repository: users-api
       type: git
-      ref: 'refs/heads/main'
+      ref: refs/heads/main
       name: user-api
 
 stages:
 
-  # === STAGE 1: PRE-BUILD ===
-  - stage: PreBuild
-    displayName: 'Pre-Build'
-    jobs:
-      - job: PreBuildAnalysis
-        displayName: 'Pre-Build Analysis'
-        steps:
-          - checkout: self
-            fetchDepth: 0
-            persistCredentials: true
+# === STAGE 1: PRE-BUILD ===
+- stage: PreBuild
+  displayName: 'Pre-Build'
+  jobs:
+    - job: PreBuildAnalysis
+      displayName: 'Pre-Build Analysis'
+      steps:
+        - checkout: self
+          fetchDepth: 0
+          persistCredentials: true
 
-          - checkout: users-api
-            fetchDepth: 0
-            persistCredentials: true
+        - checkout: users-api
+          fetchDepth: 0
+          persistCredentials: true
 
-          - script: |
-              chmod +x "$(Build.SourcesDirectory)/users-api/logging.sh"
-              chmod +x "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
-            displayName: 'Make scripts executable'
+        - script: |
+            chmod +x "$(Build.SourcesDirectory)/users-api/logging.sh"
+            chmod +x "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
+          displayName: 'Make scripts executable'
 
-          - script: |
-              sed -i 's/\r$//' "$(Build.SourcesDirectory)/users-api/logging.sh"
-              sed -i 's/\r$//' "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
-            displayName: 'Fix line endings in scripts'
+        - script: |
+            sed -i 's/\r$//' "$(Build.SourcesDirectory)/users-api/logging.sh"
+            sed -i 's/\r$//' "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
+          displayName: 'Fix line endings in scripts'
 
-          - script: |
+        - script: |
+            . "$(Build.SourcesDirectory)/users-api/logging.sh"
+            info_msg "Run logging script"
+          displayName: 'Run Logging Script'
+
+        - task: Bash@3
+          displayName: 'Print Azure DevOps Pipeline predefined variables'
+          inputs:
+            targetType: 'inline'
+            script: |
               . "$(Build.SourcesDirectory)/users-api/logging.sh"
-              info_msg "Run logging script"
-            displayName: 'Run Logging Script'
+              info_msg "Docker ID - $(DockerId)"
+              info_msg "Docker Repo - $(DockerRepo)"
+              info_msg "Service Name - $(ServiceName)"
+              if [ -z "$MANUALLY_SETUP_APP_VERSION" ]; then
+                info_msg "MANUALLY_SETUP_APP_VERSION is not set"
+              else
+                info_msg "MANUALLY_SETUP_APP_VERSION is set to $MANUALLY_SETUP_APP_VERSION"
+              fi
 
-          - task: Bash@3
-            displayName: 'Print Azure DevOps Pipeline predefined variables'
-            inputs:
-              targetType: 'inline'
-              script: |
-                . "$(Build.SourcesDirectory)/users-api/logging.sh"
-                info_msg "Docker ID - $(DockerId)"
-                info_msg "Docker Repo - $(DockerRepo)"
-                info_msg "Service Name - $(ServiceName)"
-                if [ -z "$MANUALLY_SETUP_APP_VERSION" ]; then
-                  info_msg "MANUALLY_SETUP_APP_VERSION is not set"
-                else
-                  info_msg "MANUALLY_SETUP_APP_VERSION is set to $MANUALLY_SETUP_APP_VERSION"
-                fi
+        - task: Bash@3
+          name: setAppVersionStep
+          displayName: 'Set APP_VERSION output variable'
+          inputs:
+            targetType: 'inline'
+            script: |
+              source "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
 
-          - task: Bash@3
-            name: setAppVersionStep
-            displayName: 'Set APP_VERSION output variable'
-            inputs:
-              targetType: 'inline'
-              script: |
-                source "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
+              latest_git_tag=$(get_docker_image_latest_version "$DockerRepo" "$DockerId" "$DockerToken")
+              exit_code=$?
 
-                latest_git_tag=$(get_docker_image_latest_version $(DockerRepo) $(DockerId) $(DockerToken))
-                exit_code=$?
+              if [[ $exit_code -eq 1 ]]; then
+                echo "Login failed. Please check your username and password."
+                exit 1
+              elif [[ $exit_code -eq 2 ]]; then
+                echo "Invalid version format."
+                exit 2
+              fi
 
-                if [[ $exit_code -eq 1 ]]; then
-                  echo "Login failed. Please check your username and password."
-                  exit 1
-                elif [[ $exit_code -eq 2 ]]; then
-                  echo "Invalid version format."
-                  exit 2
-                fi
+              echo "latest_git_tag=$latest_git_tag"
+              if [ -z "$latest_git_tag" ]; then
+                echo "APP_VERSION not retrieved. Exiting..."
+                exit 3
+              fi
 
-                echo "latest_git_tag=$latest_git_tag"
-                if [ -z "$latest_git_tag" ]; then
-                  echo "APP_VERSION not retrieved. Exiting..."
-                  exit 3
-                fi
+# === STAGE 2: BUILD AND TEST ===
+- stage: BuildAndTest
+  displayName: 'Project: Build and Test'
+  dependsOn: PreBuild
+  condition: succeeded()
+  jobs:
+    - job: BuildAndTest
+      displayName: 'Build And Test'
+      steps:
+        - script: |
+            echo "== Compiling project =="
+            mkdir -p $(Build.ArtifactStagingDirectory)/build
+            echo "Compiled app binary" > $(Build.ArtifactStagingDirectory)/build/app.bin
+          displayName: 'Build Project'
 
-  # === STAGE 2: BUILD AND TEST ===
-  - stage: BuildAndTest
-    displayName: 'Project: Build and Test'
-    dependsOn: PreBuild
-    condition: succeeded()
-    jobs:
-      - job: BuildAndTest
-        displayName: 'Build And Test'
-        steps:
-          - script: |
-              echo "== Compiling project =="
-              mkdir -p $(Build.ArtifactStagingDirectory)/build
-              echo "Compiled app binary" > $(Build.ArtifactStagingDirectory)/build/app.bin
-            displayName: 'Build Project'
+        - task: PublishBuildArtifacts@1
+          inputs:
+            pathToPublish: '$(Build.ArtifactStagingDirectory)/build'
+            artifactName: 'build-artifact'
+            publishLocation: 'Container'
+          displayName: 'Publish Build Artifact'
 
-          - task: PublishBuildArtifacts@1
-            inputs:
-              pathToPublish: '$(Build.ArtifactStagingDirectory)/build'
-              artifactName: 'build-artifact'
-              publishLocation: 'Container'
-            displayName: 'Publish Build Artifact'
+        - script: |
+            echo "== Running Unit Tests =="
+            echo "Simulating unit tests..."
+            echo "All tests passed"
+          displayName: 'Run Unit Tests'
 
-          - script: |
-              echo "== Running Unit Tests =="
-              echo "Simulating unit tests..."
-              echo "All tests passed"
-            displayName: 'Run Unit Tests'
+# === STAGE 3: DOCKER BUILD AND PUSH ===
+- stage: DockerBuildAndPush
+  displayName: 'Docker: Build and Push'
+  dependsOn: BuildAndTest
+  condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'main'))
+  jobs:
+    - job: BuildAndPush
+      displayName: 'Build and Push Docker Image'
+      steps:
+        - task: Docker@2
+          displayName: 'Build Docker Image'
+          inputs:
+            containerRegistry: 'sillerolena' # Connection name
+            repository: 'sillerolena/lab4'
+            command: 'build'
+            Dockerfile: '$(Build.SourcesDirectory)/Dockerfile'
+            buildContext: '$(Build.SourcesDirectory)'
+            tags: |
+              $(Build.BuildId)
+              0.0.2
+              latest
 
-  # === STAGE 3: DOCKER BUILD AND PUSH ===
-  - stage: DockerBuildAndPush
-    displayName: 'Docker: Build and Push'
-    dependsOn: BuildAndTest
-    condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'main'))
-    jobs:
-      - job: BuildAndPush
-        displayName: 'Build and Push Docker Image'
-        steps:
-          - task: Docker@2
-            displayName: 'Build Docker Image'
-            inputs:
-              containerRegistry: 'sillerolena'
-              repository: 'sillerolena/lab4'
-              command: 'build'
-              Dockerfile: '$(Build.SourcesDirectory)/Dockerfile'
-              buildContext: '$(Build.SourcesDirectory)'
-              tags: |
-                $(Build.BuildId)
-                0.0.2
-                latest
+        - task: Docker@2
+          displayName: 'Push Docker Image'
+          inputs:
+            containerRegistry: 'sillerolena'
+            repository: 'sillerolena/lab4'
+            command: 'push'
+            tags: |
+              $(Build.BuildId)
+              0.0.2
+              latest
 
-          - task: Docker@2
-            displayName: 'Push Docker Image'
-            inputs:
-              containerRegistry: 'sillerolena'
-              repository: 'sillerolena/lab4'
-              command: 'push'
-              tags: |
-                $(Build.BuildId)
-                0.0.2
-                latest
+# === STAGE 4: HELM CHART PACK ===
+- stage: HelmChartPack
+  displayName: 'Helm Chart: Pack and Push'
+  dependsOn: DockerBuildAndPush
+  condition: succeeded()
+  jobs:
+    - job: PackAndPush
+      displayName: 'Pack and Push'
+      steps:
+        - script: |
+            echo "Packing and pushing Helm chart..."
+          displayName: 'Helm Chart Step'
 
-  # === STAGE 4: HELM CHART PACK ===
-  - stage: HelmChartPack
-    displayName: 'Helm Chart: Pack and Push'
-    dependsOn: DockerBuildAndPush
-    condition: succeeded()
-    jobs:
-      - job: PackAndPush
-        displayName: 'Pack and Push'
-        steps:
-          - script: |
-              echo "Packing and pushing Helm chart..."
-            displayName: 'Helm Chart Step'
-
-  # === STAGE 5: POST-BUILD ===
-  - stage: PostBuild
-    displayName: 'Post-Build'
-    dependsOn: HelmChartPack
-    condition: succeeded()
-    jobs:
-      - job: PostBuild
-        displayName: 'Post-Build'
-        steps:
-          - script: |
-              echo "Post-build cleanup or report step"
-            displayName: 'Post-Build Step'
+# === STAGE 5: POST-BUILD ===
+- stage: PostBuild
+  displayName: 'Post-Build'
+  dependsOn: HelmChartPack
+  condition: succeeded()
+  jobs:
+    - job: PostBuild
+      displayName: 'Post-Build'
+      steps:
+        - script: |
+            echo "Post-build cleanup or report step"
+          displayName: 'Post-Build Step'
 
 
 
