@@ -5,7 +5,7 @@ trigger:
       - feature/*
 
 variables: 
-  - group: 'USERS_API_VARIABLE_GROUP'
+  - group: 'DockerCredentials'
   - name: DockerId
     value: "$(DOCKER_ID)"
   - name: DockerToken
