@@ -43,17 +43,17 @@ stages:
             persistCredentials: true
 
           - script: |
-              chmod +x "$(Build.SourcesDirectory)/user-api/logging.sh"
-              chmod +x "$(Build.SourcesDirectory)/user-api/common-script/dockerhub.sh"
+              chmod +x "$(Build.SourcesDirectory)/users-api/logging.sh"
+              chmod +x "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
             displayName: 'Make scripts executable'
 
           - script: |
-              sed -i 's/\r$//' "$(Build.SourcesDirectory)/user-api/logging.sh"
-              sed -i 's/\r$//' "$(Build.SourcesDirectory)/user-api/common-script/dockerhub.sh"
+              sed -i 's/\r$//' "$(Build.SourcesDirectory)/users-api/logging.sh"
+              sed -i 's/\r$//' "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
             displayName: 'Fix line endings in scripts'
 
           - script: |
-              . "$(Build.SourcesDirectory)/user-api/logging.sh"
+              . "$(Build.SourcesDirectory)/users-api/logging.sh"
               info_msg "Run logging script"
             displayName: 'Run Logging Script'
 
@@ -62,7 +62,7 @@ stages:
             inputs:
               targetType: 'inline'
               script: |
-                . "$(Build.SourcesDirectory)/user-api/logging.sh"
+                . "$(Build.SourcesDirectory)/users-api/logging.sh"
                 info_msg "Docker ID - $(DockerId)"
                 info_msg "Docker Repo - $(DockerRepo)"
                 info_msg "Service Name - $(ServiceName)"
@@ -78,7 +78,7 @@ stages:
             inputs:
               targetType: 'inline'
               script: |
-                source "$(Build.SourcesDirectory)/user-api/common-script/dockerhub.sh"
+                source "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
 
                 latest_git_tag=$(get_docker_image_latest_version $(DockerRepo) $(DockerId) $(DockerToken))
                 exit_code=$?
@@ -140,7 +140,7 @@ stages:
               containerRegistry: 'sillerolena'
               repository: 'sillerolena/lab4'
               command: 'build'
-              Dockerfile: '$(Build.SourcesDirectory)/Dockerfile'
+              Dockerfile: '$(Build.SourcesDirectory)/docker/Dockerfile'  # Correct the path to Dockerfile
               buildContext: '$(Build.SourcesDirectory)'
               tags: |
                 $(Build.BuildId)
@@ -183,6 +183,7 @@ stages:
           - script: |
               echo "Post-build cleanup or report step"
             displayName: 'Post-Build Step'
+
 
 
 
