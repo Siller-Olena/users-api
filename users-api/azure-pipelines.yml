@@ -74,8 +74,24 @@ stages:
               targetType: 'inline'
               script: |
                 latest_version=$(python3 $(Build.SourcesDirectory)/users-api/get_latest_version.py)
+
+
+                echo "latest_git_tag=$latest_git_tag"
+                if [ -z "$latest_git_tag"]; then
+                echo "APP_VERSION not retrieved. Exiting"
+                exit 3
+                fi
+
+                IFS='.' read -r -a version_parts<<< "$latest_git_tag"
+                major="${version_parts[0]}"
+                minor="${version_parts[1]}"
+                patch="${version_parts[2]}"
+                ((patch++))
+                new_version="$major.$minor.$patch"
+                echo "New version: $new_version"
                 echo "##vso[task.setvariable variable=APP_VERSION;isOutput=true]$latest_version"
                 echo "APP_VERSION is set to $latest_version"
+
 
   - stage: BuildAndTest
     displayName: 'Project: Build and Test'
