@@ -4,86 +4,188 @@ trigger:
       - main
       - feature/*
 
+variables: 
+  - group: 'DockerCredentials'
+  - name: DockerId
+    value: "$(DOCKER_ID)"
+  - name: DockerToken
+    value: "$(DOCKER_TOKEN)"
+  - name: DockerRepo
+    value: "$(DOCKER_REPO)"
+  - name: ServiceName
+    value: "$(SERVICE_NAME)"
+  - name: APP_VERSION
+    value: ""  # Буде заповнено пізніше
+
+pool:
+  vmImage: 'ubuntu-latest'
+
 resources:
   repositories:
     - repository: users-api
       type: git
-      name: olenasiller/users-api  
-      ref: /main     
-      trigger:
-        branches:
-          include:
-            - main            
-            - feature/*       
+      ref: 'refs/heads/main'
+      name: user-api
 
 stages:
+
+  # === STAGE 1: PRE-BUILD ===
   - stage: PreBuild
     displayName: 'Pre-Build'
     jobs:
       - job: PreBuildAnalysis
         displayName: 'Pre-Build Analysis'
-        pool:
-          vmImage: 'ubuntu-latest'
-        
         steps:
-          - script: echo "Hello, from Pre-Build Job"
-            displayName: 'Pre-Build Job'
+          - checkout: self
+            fetchDepth: 0
+            persistCredentials: true
+
+          - checkout: users-api
+            fetchDepth: 0
+            persistCredentials: true
 
           - script: |
-              echo "Agent.TempDirectory: $(Agent.TempDirectory)"
-              echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
-              echo "Build.Repository.LocalPath: $(Build.Repository.LocalPath)"
-              echo "Build.Repository.Name: $(Build.Repository.Name)"
-              echo "Build.SourceBranch: $(Build.SourceBranch)"
-              echo "Build.SourceBranchName: $(Build.SourceBranchName)"
-              echo "Build.SourcesDirectory: $(Build.SourcesDirectory)"
-              echo "Build.StagingDirectory: $(Build.StagingDirectory)"
-            displayName: 'Print Azure DevOps Pipeline predefined variables'
+              chmod +x "$(Build.SourcesDirectory)/users-api/logging.sh"
+              chmod +x "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
+            displayName: 'Make scripts executable'
 
+          - script: |
+              sed -i 's/\r$//' "$(Build.SourcesDirectory)/users-api/logging.sh"
+              sed -i 's/\r$//' "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
+            displayName: 'Fix line endings in scripts'
+
+          - script: |
+              . "$(Build.SourcesDirectory)/users-api/logging.sh"
+              info_msg "Run logging script"
+            displayName: 'Run Logging Script'
+
+          - task: Bash@3
+            displayName: 'Print Azure DevOps Pipeline predefined variables'
+            inputs:
+              targetType: 'inline'
+              script: |
+                . "$(Build.SourcesDirectory)/users-api/logging.sh"
+                info_msg "Docker ID - $(DockerId)"
+                info_msg "Docker Repo - $(DockerRepo)"
+                info_msg "Service Name - $(ServiceName)"
+                if [ -z "$MANUALLY_SETUP_APP_VERSION" ]; then
+                  info_msg "MANUALLY_SETUP_APP_VERSION is not set"
+                else
+                  info_msg "MANUALLY_SETUP_APP_VERSION is set to $MANUALLY_SETUP_APP_VERSION"
+                fi
+
+          # Запускаємо Python скрипт для отримання останньої версії Docker образу
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '3.x'
+              addToPath: true
+
+          - script: |
+              python3 "$(Build.SourcesDirectory)/users-api/get_latest_version.py"
+            displayName: 'Run Python script to get latest Docker version'
+
+          # Встановлюємо значення APP_VERSION для подальшого використання в пайплайні
+          - script: |
+              echo "APP_VERSION=$(python3 $(Build.SourcesDirectory)/users-api/get_latest_version.py)" >> $(Build.ArtifactStagingDirectory)/variables.txt
+            displayName: 'Set APP_VERSION output variable'
+
+          - task: Bash@3
+            name: setAppVersionStep
+            displayName: 'Set APP_VERSION output variable'
+            inputs:
+              targetType: 'inline'
+              script: |
+                # Читаємо значення APP_VERSION з файлу, встановленого в попередньому кроці
+                source $(Build.ArtifactStagingDirectory)/variables.txt
+                echo "APP_VERSION is set to $APP_VERSION"
+                if [ -z "$APP_VERSION" ]; then
+                  echo "APP_VERSION not retrieved. Exiting..."
+                  exit 3
+                fi
+                echo "APP_VERSION=$APP_VERSION" >> $(Build.ArtifactStagingDirectory)/variables.txt
+            displayName: 'Log APP_VERSION'
+
+  # === STAGE 2: BUILD AND TEST ===
   - stage: BuildAndTest
     displayName: 'Project: Build and Test'
     dependsOn: PreBuild
+    condition: succeeded()
     jobs:
       - job: BuildAndTest
-        displayName: 'Build and Test'
-        pool:
-          vmImage: 'ubuntu-latest'
+        displayName: 'Build And Test'
         steps:
-          - script: echo "Hello, from Build and Test Job"
-            displayName: 'Build and Test Job'
+          - script: |
+              echo "== Compiling project ==" 
+              mkdir -p $(Build.ArtifactStagingDirectory)/build
+              echo "Compiled app binary" > $(Build.ArtifactStagingDirectory)/build/app.bin
+            displayName: 'Build Project'
 
+          - task: PublishBuildArtifacts@1
+            inputs:
+              pathToPublish: '$(Build.ArtifactStagingDirectory)/build'
+              artifactName: 'build-artifact'
+              publishLocation: 'Container'
+            displayName: 'Publish Build Artifact'
+
+          - script: |
+              echo "== Running Unit Tests =="
+              echo "Simulating unit tests..."
+              echo "All tests passed"
+            displayName: 'Run Unit Tests'
+
+  # === STAGE 3: DOCKER BUILD AND PUSH ===
   - stage: DockerBuildAndPush
     displayName: 'Docker: Build and Push'
     dependsOn: BuildAndTest
+    condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'main'))
     jobs:
       - job: BuildAndPush
         displayName: 'Build and Push Docker Image'
-        pool:
-          vmImage: 'ubuntu-latest'
         steps:
-          - script: echo "Hello, from Docker Build and Push Job"
-            displayName: 'Docker Build and Push Job'
+          - task: Docker@2
+            displayName: 'Build Docker Image'
+            inputs:
+              containerRegistry: 'sillerolena'
+              repository: 'sillerolena/lab4'
+              command: 'build'
+              Dockerfile: '$(Build.SourcesDirectory)/docker/Dockerfile'  # Correct path to Dockerfile
+              buildContext: '$(Build.SourcesDirectory)'
+              tags: |
+                $(Build.BuildId)
+                $(APP_VERSION)  # Використовуємо APP_VERSION для тегу
 
-  - stage: HelmChartPackAndPush
+          - task: Docker@2
+            displayName: 'Push Docker Image'
+            inputs:
+              containerRegistry: 'sillerolena'
+              repository: 'sillerolena/lab4'
+              command: 'push'
+              tags: |
+                $(Build.BuildId)
+                $(APP_VERSION)  # Використовуємо APP_VERSION для тегу
+
+  # === STAGE 4: HELM CHART PACK ===
+  - stage: HelmChartPack
     displayName: 'Helm Chart: Pack and Push'
     dependsOn: DockerBuildAndPush
+    condition: succeeded()
     jobs:
       - job: PackAndPush
-        displayName: 'Helm Chart Pack and Push'
-        pool:
-          vmImage: 'ubuntu-latest'
+        displayName: 'Pack and Push'
         steps:
-          - script: echo "Hello, from Helm Chart Pack and Push Job"
-            displayName: 'Helm Chart Pack and Push Job'
+          - script: |
+              echo "Packing and pushing Helm chart..."
+            displayName: 'Helm Chart Step'
 
+  # === STAGE 5: POST-BUILD ===
   - stage: PostBuild
     displayName: 'Post-Build'
-    dependsOn: HelmChartPackAndPush
+    dependsOn: HelmChartPack
+    condition: succeeded()
     jobs:
       - job: PostBuild
         displayName: 'Post-Build'
-        pool:
-          vmImage: 'ubuntu-latest'
         steps:
-          - script: echo "Hello, from Post-Build Job"
-            displayName: 'Post-Build Job'
+          - script: |
+              echo "Post-build cleanup or report step"
+            displayName: 'Post-Build Step'
