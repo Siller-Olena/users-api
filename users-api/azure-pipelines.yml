@@ -45,11 +45,17 @@ stages:
               chmod +x "$(Build.SourcesDirectory)/users-api/logging.sh"
               chmod +x "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
             displayName: 'Make scripts executable'
-
+            
           - script: |
               sed -i 's/\r$//' "$(Build.SourcesDirectory)/users-api/logging.sh"
               sed -i 's/\r$//' "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
             displayName: 'Fix line endings in scripts'
+            if [ -z "$MANUALLY_SETUP_APP_VERSION" ]; then
+
+            else
+              APP_VERSION="$MANUALLY_SETUP_APP_VERSION"
+            fi
+            echo "##vso[task.setvariable variable=APP_VERSION;isOutput=true]$APP_VERSION"
 
           - script: |
               . "$(Build.SourcesDirectory)/users-api/logging.sh"
