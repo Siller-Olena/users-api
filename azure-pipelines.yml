@@ -65,21 +65,31 @@ stages:
     condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'main'))
     jobs:
       - job: BuildAndPush
-        displayName: 'Build and Push'
+        displayName: 'Build and Push Docker Image'
         steps:
           - task: Docker@2
             displayName: 'Build Docker Image'
             inputs:
+              containerRegistry: 'sillerolena'  # ← укажи свой сервис-коннекшн
+              repository: 'sillerolena/lab4' # ← укажи свой dockerhub repo
               command: 'build'
               Dockerfile: '$(Build.SourcesDirectory)/Dockerfile'
               buildContext: '$(Build.SourcesDirectory)'
-              tags: '$(Build.BuildId)'
+              tags: |
+                $(Build.BuildId)
+                0.0.2
+                latest
 
           - task: Docker@2
             displayName: 'Push Docker Image'
             inputs:
+              containerRegistry: 'sillerolena'
+              repository: sillerolena'
               command: 'push'
-              tags: '$(Build.BuildId)'
+              tags: |
+                $(Build.BuildId)
+                0.0.2
+                latest
 
   # === STAGE 4: HELM CHART PACK ===
   - stage: HelmChartPack
@@ -106,6 +116,7 @@ stages:
           - script: |
               echo "Post-build cleanup or report step"
             displayName: 'Post-Build Step'
+
 
 
 
