@@ -140,7 +140,7 @@ stages:
               containerRegistry: 'sillerolena'
               repository: 'sillerolena/lab4'
               command: 'build'
-              Dockerfile: '$(Build.SourcesDirectory)/docker/Dockerfile'  # Correct the path to Dockerfile
+              Dockerfile: '$(Build.SourcesDirectory)/Dockerfile'
               buildContext: '$(Build.SourcesDirectory)'
               tags: |
                 $(Build.BuildId)
@@ -183,6 +183,7 @@ stages:
           - script: |
               echo "Post-build cleanup or report step"
             displayName: 'Post-Build Step'
+
 
 
 
