@@ -4,7 +4,7 @@ trigger:
       - main
       - feature/*
 
-variables: 
+variables:
   - group: 'DockerCredentials'
   - name: DockerId
     value: "$(DOCKER_ID)"
@@ -14,8 +14,6 @@ variables:
     value: "$(DOCKER_REPO)"
   - name: ServiceName
     value: "$(SERVICE_NAME)"
-  - name: APP_VERSION
-    value: ""  # Буде заповнено пізніше
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -29,11 +27,10 @@ resources:
 
 stages:
 
-  # === STAGE 1: PRE-BUILD ===
   - stage: PreBuild
     displayName: 'Pre-Build'
     jobs:
-      - job: PreBuildAnalysis
+      - job: SetVersionJob
         displayName: 'Pre-Build Analysis'
         steps:
           - checkout: self
@@ -59,35 +56,10 @@ stages:
               info_msg "Run logging script"
             displayName: 'Run Logging Script'
 
-          - task: Bash@3
-            displayName: 'Print Azure DevOps Pipeline predefined variables'
-            inputs:
-              targetType: 'inline'
-              script: |
-                . "$(Build.SourcesDirectory)/users-api/logging.sh"
-                info_msg "Docker ID - $(DockerId)"
-                info_msg "Docker Repo - $(DockerRepo)"
-                info_msg "Service Name - $(ServiceName)"
-                if [ -z "$MANUALLY_SETUP_APP_VERSION" ]; then
-                  info_msg "MANUALLY_SETUP_APP_VERSION is not set"
-                else
-                  info_msg "MANUALLY_SETUP_APP_VERSION is set to $MANUALLY_SETUP_APP_VERSION"
-                fi
-
-          # Запускаємо Python скрипт для отримання останньої версії Docker образу
           - task: UsePythonVersion@0
             inputs:
               versionSpec: '3.x'
               addToPath: true
-
-          - script: |
-              python3 "$(Build.SourcesDirectory)/users-api/get_latest_version.py"
-            displayName: 'Run Python script to get latest Docker version'
-
-          # Встановлюємо значення APP_VERSION для подальшого використання в пайплайні
-          - script: |
-              echo "APP_VERSION=$(python3 $(Build.SourcesDirectory)/users-api/get_latest_version.py)" >> $(Build.ArtifactStagingDirectory)/variables.txt
-            displayName: 'Set APP_VERSION output variable'
 
           - task: Bash@3
             name: setAppVersionStep
@@ -95,17 +67,10 @@ stages:
             inputs:
               targetType: 'inline'
               script: |
-                # Читаємо значення APP_VERSION з файлу, встановленого в попередньому кроці
-                source $(Build.ArtifactStagingDirectory)/variables.txt
-                echo "APP_VERSION is set to $APP_VERSION"
-                if [ -z "$APP_VERSION" ]; then
-                  echo "APP_VERSION not retrieved. Exiting..."
-                  exit 3
-                fi
-                echo "APP_VERSION=$APP_VERSION" >> $(Build.ArtifactStagingDirectory)/variables.txt
-            displayName: 'Log APP_VERSION'
+                latest_version=$(python3 $(Build.SourcesDirectory)/users-api/get_latest_version.py)
+                echo "##vso[task.setvariable variable=APP_VERSION;isOutput=true]$latest_version"
+                echo "APP_VERSION is set to $latest_version"
 
-  # === STAGE 2: BUILD AND TEST ===
   - stage: BuildAndTest
     displayName: 'Project: Build and Test'
     dependsOn: PreBuild
@@ -115,7 +80,7 @@ stages:
         displayName: 'Build And Test'
         steps:
           - script: |
-              echo "== Compiling project ==" 
+              echo "== Compiling project =="
               mkdir -p $(Build.ArtifactStagingDirectory)/build
               echo "Compiled app binary" > $(Build.ArtifactStagingDirectory)/build/app.bin
             displayName: 'Build Project'
@@ -133,11 +98,12 @@ stages:
               echo "All tests passed"
             displayName: 'Run Unit Tests'
 
-  # === STAGE 3: DOCKER BUILD AND PUSH ===
   - stage: DockerBuildAndPush
     displayName: 'Docker: Build and Push'
-    dependsOn: BuildAndTest
+    dependsOn: PreBuild
     condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'main'))
+    variables:
+      appVersion: $[ stageDependencies.PreBuild.SetVersionJob.outputs['setAppVersionStep.APP_VERSION'] ]
     jobs:
       - job: BuildAndPush
         displayName: 'Build and Push Docker Image'
@@ -148,11 +114,11 @@ stages:
               containerRegistry: 'sillerolena'
               repository: 'sillerolena/lab4'
               command: 'build'
-              Dockerfile: '$(Build.SourcesDirectory)/docker/Dockerfile'  # Correct path to Dockerfile
+              Dockerfile: '$(Build.SourcesDirectory)/docker/Dockerfile'
               buildContext: '$(Build.SourcesDirectory)'
               tags: |
                 $(Build.BuildId)
-                $(APP_VERSION)  # Використовуємо APP_VERSION для тегу
+                $(appVersion)
 
           - task: Docker@2
             displayName: 'Push Docker Image'
@@ -162,9 +128,8 @@ stages:
               command: 'push'
               tags: |
                 $(Build.BuildId)
-                $(APP_VERSION)  # Використовуємо APP_VERSION для тегу
+                $(appVersion)
 
-  # === STAGE 4: HELM CHART PACK ===
   - stage: HelmChartPack
     displayName: 'Helm Chart: Pack and Push'
     dependsOn: DockerBuildAndPush
@@ -177,7 +142,6 @@ stages:
               echo "Packing and pushing Helm chart..."
             displayName: 'Helm Chart Step'
 
-  # === STAGE 5: POST-BUILD ===
   - stage: PostBuild
     displayName: 'Post-Build'
     dependsOn: HelmChartPack
