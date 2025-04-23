@@ -67,21 +67,13 @@ stages:
       - job: BuildAndPush
         displayName: 'Build and Push'
         steps:
-          - task: DownloadBuildArtifacts@0
-            inputs:
-              buildType: 'current'
-              downloadType: 'single'
-              artifactName: 'build-artifact'
-              downloadPath: '$(Pipeline.Workspace)/build'
-            displayName: 'Download Build Artifact'
-
           - task: Docker@2
             displayName: 'Build Docker Image'
             inputs:
               command: 'build'
-              Dockerfile: '**/Dockerfile'
+              Dockerfile: '$(Build.SourcesDirectory)/Dockerfile'
+              buildContext: '$(Build.SourcesDirectory)'
               tags: '$(Build.BuildId)'
-              buildContext: '$(Pipeline.Workspace)/build'
 
           - task: Docker@2
             displayName: 'Push Docker Image'
@@ -114,5 +106,6 @@ stages:
           - script: |
               echo "Post-build cleanup or report step"
             displayName: 'Post-Build Step'
+
 
 
