@@ -1,20 +1,30 @@
-# Use official Python image as base (slim version for reduced size)
-FROM python:3.11-slim
-# Set working directory
+# Basis-Image mit Python 3.11
+FROM python:3.11
+
+# Setze das Arbeitsverzeichnis
 WORKDIR /app
-# Copy only requirements first to leverage Docker caching
-COPY ./requirements.txt .
 
+# Kopiere die Abhängigkeitsdateien und installiere sie
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Install dependencies with pip
-RUN pip install --no-cache-dir --upgrade pip && \
-pip install --no-cache-dir -r requirements.txt
+# Kopiere den gesamten Code ins Container-Image
+COPY . /app
 
-# Copy all files from current directory into the container file system
-COPY . .
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Ensure FastAPI Standard port
-EXPOSE 8000
+# Install Alembic
+RUN pip install alembic
 
-# Start application 
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Setze Umgebungsvariablen für FastAPI
+ENV PYTHONUNBUFFERED=1
+
+# Führe Alembic-Migrationen aus
+RUN alembic upgrade head
+
+# Expose port 5000 for the Flask app
+EXPOSE 5000
+
+# Run alembic upgrade when the container starts
+CMD ["sh", "-c", "alembic upgrade head && uvicorn src.main:app --host=0.0.0.0 --port=8000"]
