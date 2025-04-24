@@ -44,18 +44,9 @@ stages:
           - script: |
               chmod +x "$(Build.SourcesDirectory)/users-api/logging.sh"
               chmod +x "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
-            displayName: 'Make scripts executable'
-            
-          - script: |
               sed -i 's/\r$//' "$(Build.SourcesDirectory)/users-api/logging.sh"
               sed -i 's/\r$//' "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
-            displayName: 'Fix line endings in scripts'
-            if [ -z "$MANUALLY_SETUP_APP_VERSION" ]; then
-
-            else
-              APP_VERSION="$MANUALLY_SETUP_APP_VERSION"
-            fi
-            echo "##vso[task.setvariable variable=APP_VERSION;isOutput=true]$APP_VERSION"
+            displayName: 'Make scripts executable & fix line endings'
 
           - script: |
               . "$(Build.SourcesDirectory)/users-api/logging.sh"
@@ -73,25 +64,23 @@ stages:
             inputs:
               targetType: 'inline'
               script: |
-                latest_version=$(python3 $(Build.SourcesDirectory)/users-api/get_latest_version.py)
-
-
+                latest_git_tag=$(python3 $(Build.SourcesDirectory)/users-api/get_latest_version.py)
                 echo "latest_git_tag=$latest_git_tag"
-                if [ -z "$latest_git_tag"]; then
-                echo "APP_VERSION not retrieved. Exiting"
-                exit 3
+
+                if [ -z "$latest_git_tag" ]; then
+                  echo "APP_VERSION not retrieved. Exiting"
+                  exit 3
                 fi
 
-                IFS='.' read -r -a version_parts<<< "$latest_git_tag"
+                IFS='.' read -r -a version_parts <<< "$latest_git_tag"
                 major="${version_parts[0]}"
                 minor="${version_parts[1]}"
                 patch="${version_parts[2]}"
                 ((patch++))
                 new_version="$major.$minor.$patch"
                 echo "New version: $new_version"
-                echo "##vso[task.setvariable variable=APP_VERSION;isOutput=true]$latest_version"
-                echo "APP_VERSION is set to $latest_version"
-
+                echo "##vso[task.setvariable variable=APP_VERSION;isOutput=true]$new_version"
+                echo "APP_VERSION is set to $new_version"
 
   - stage: BuildAndTest
     displayName: 'Project: Build and Test'
@@ -130,6 +119,12 @@ stages:
       - job: BuildAndPush
         displayName: 'Build and Push Docker Image'
         steps:
+          - task: Docker@2
+            displayName: 'Login to DockerHub'
+            inputs:
+              command: login
+              containerRegistry: 'sillerolena'
+
           - task: Docker@2
             displayName: 'Build Docker Image'
             inputs:
@@ -175,3 +170,4 @@ stages:
           - script: |
               echo "Post-build cleanup or report step"
             displayName: 'Post-Build Step'
+
