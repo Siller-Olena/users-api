@@ -18,13 +18,6 @@ variables:
 pool:
   vmImage: 'ubuntu-latest'
 
-resources:
-  repositories:
-    - repository: users-api
-      type: git
-      ref: 'refs/heads/main'
-      name: user-api
-
 stages:
 
   - stage: PreBuild
@@ -37,22 +30,18 @@ stages:
             fetchDepth: 0
             persistCredentials: true
 
-          - checkout: users-api
-            fetchDepth: 0
-            persistCredentials: true
-
           - script: |
-              chmod +x "$(Build.SourcesDirectory)/users-api/logging.sh"
-              chmod +x "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
+              chmod +x "$(Build.SourcesDirectory)/logging.sh"
+              chmod +x "$(Build.SourcesDirectory)/common-script/dockerhub.sh"
             displayName: 'Make scripts executable'
-
+          
           - script: |
-              sed -i 's/\r$//' "$(Build.SourcesDirectory)/users-api/logging.sh"
-              sed -i 's/\r$//' "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
+              sed -i 's/\r$//' "$(Build.SourcesDirectory)/logging.sh"
+              sed -i 's/\r$//' "$(Build.SourcesDirectory)/common-script/dockerhub.sh"
             displayName: 'Fix line endings in scripts'
 
           - script: |
-              . "$(Build.SourcesDirectory)/users-api/logging.sh"
+              . "$(Build.SourcesDirectory)/logging.sh"
               info_msg "Run logging script"
             displayName: 'Run Logging Script'
 
@@ -67,21 +56,16 @@ stages:
             inputs:
               targetType: 'inline'
               script: |
-                latest_git_tag=$(python3 $(Build.SourcesDirectory)/users-api/get_latest_version.py)
-                echo "latest_git_tag=$latest_git_tag"
-                if [ -z "$latest_git_tag" ]; then
+                latest_version=$(python3 $(Build.SourcesDirectory)/get_latest_vertion.py)
+
+                echo "latest_version=$latest_version"
+                if [ -z "$latest_version" ]; then
                   echo "APP_VERSION not retrieved. Exiting"
                   exit 3
                 fi
-                IFS='.' read -r -a version_parts <<< "$latest_git_tag"
-                major="${version_parts[0]}"
-                minor="${version_parts[1]}"
-                patch="${version_parts[2]}"
-                ((patch++))
-                new_version="$major.$minor.$patch"
-                echo "New version: $new_version"
-                echo "##vso[task.setvariable variable=APP_VERSION;isOutput=true]$new_version"
-                echo "APP_VERSION is set to $new_version"
+
+                echo "##vso[task.setvariable variable=APP_VERSION;isOutput=true]$latest_version"
+                echo "APP_VERSION is set to $latest_version"
 
   - stage: BuildAndTest
     displayName: 'Project: Build and Test'
@@ -126,7 +110,7 @@ stages:
               containerRegistry: 'sillerolena'
               repository: 'sillerolena/lab4'
               command: 'build'
-              Dockerfile: '$(Build.SourcesDirectory)/Dockerfile'
+              Dockerfile: '$(Build.SourcesDirectory)/Dockerfile'   # теперь верный путь
               buildContext: '$(Build.SourcesDirectory)'
               tags: |
                 $(Build.BuildId)
@@ -165,5 +149,6 @@ stages:
           - script: |
               echo "Post-build cleanup or report step"
             displayName: 'Post-Build Step'
+
 
 
