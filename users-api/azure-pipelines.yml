@@ -13,7 +13,7 @@ variables:
   - name: DockerRepo
     value: "$(DOCKER_REPO)"
   - name: ServiceName
-    value: "$(SERVICE_NAME)"
+    value: "$(DOCKER_REPO)"
 
 pool:
   vmImage: 'ubuntu-latest'
