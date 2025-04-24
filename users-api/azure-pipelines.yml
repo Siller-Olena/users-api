@@ -7,9 +7,9 @@ trigger:
 variables:
   - group: 'DockerCredentials'
   - name: DockerId
-    value: "$(DOCKER_ID)"
+    value: "$(DOCKER_USERNAME)"
   - name: DockerToken
-    value: "$(DOCKER_TOKEN)"
+    value: "$(DOCKER_PASSWORD)"
   - name: DockerRepo
     value: "$(DOCKER_REPO)"
   - name: ServiceName
