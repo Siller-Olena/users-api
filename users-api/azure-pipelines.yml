@@ -44,9 +44,12 @@ stages:
           - script: |
               chmod +x "$(Build.SourcesDirectory)/users-api/logging.sh"
               chmod +x "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
+            displayName: 'Make scripts executable'
+
+          - script: |
               sed -i 's/\r$//' "$(Build.SourcesDirectory)/users-api/logging.sh"
               sed -i 's/\r$//' "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
-            displayName: 'Make scripts executable & fix line endings'
+            displayName: 'Fix line endings in scripts'
 
           - script: |
               . "$(Build.SourcesDirectory)/users-api/logging.sh"
@@ -66,12 +69,10 @@ stages:
               script: |
                 latest_git_tag=$(python3 $(Build.SourcesDirectory)/users-api/get_latest_version.py)
                 echo "latest_git_tag=$latest_git_tag"
-
                 if [ -z "$latest_git_tag" ]; then
                   echo "APP_VERSION not retrieved. Exiting"
                   exit 3
                 fi
-
                 IFS='.' read -r -a version_parts <<< "$latest_git_tag"
                 major="${version_parts[0]}"
                 minor="${version_parts[1]}"
@@ -120,18 +121,12 @@ stages:
         displayName: 'Build and Push Docker Image'
         steps:
           - task: Docker@2
-            displayName: 'Login to DockerHub'
-            inputs:
-              command: login
-              containerRegistry: 'sillerolena'
-
-          - task: Docker@2
             displayName: 'Build Docker Image'
             inputs:
               containerRegistry: 'sillerolena'
               repository: 'sillerolena/lab4'
               command: 'build'
-              Dockerfile: '$(Build.SourcesDirectory)/docker/Dockerfile'
+              Dockerfile: '$(Build.SourcesDirectory)/Dockerfile'
               buildContext: '$(Build.SourcesDirectory)'
               tags: |
                 $(Build.BuildId)
@@ -170,4 +165,5 @@ stages:
           - script: |
               echo "Post-build cleanup or report step"
             displayName: 'Post-Build Step'
+
 
