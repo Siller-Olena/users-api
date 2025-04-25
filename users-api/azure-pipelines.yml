@@ -20,153 +20,149 @@ pool:
 
 stages:
 
-  - stage: PreBuild
-    displayName: 'Pre-Build'
-    jobs:
-      - job: SetVersionJob
-        displayName: 'Pre-Build Analysis'
-        steps:
-          - checkout: self
-            fetchDepth: 0
-            persistCredentials: true
+# === PRE-BUILD ===
+- stage: PreBuild
+  displayName: 'Pre-Build'
+  jobs:
+    - job: SetVersionJob
+      name: SetVersionJob
+      displayName: 'Pre-Build Analysis'
+      steps:
+        - checkout: self
+          fetchDepth: 0
+          persistCredentials: true
 
-          - script: |
-              echo "Current directory:"
-              pwd
-              echo "Listing all files and folders:"
-              ls -la
-              chmod +x "$(Build.SourcesDirectory)/users-api/logging.sh"
-              chmod +x "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
-            displayName: 'Make scripts executable'
+        - script: |
+            echo "Current directory:"
+            pwd
+            echo "Listing all files and folders:"
+            ls -la
+            chmod +x "$(Build.SourcesDirectory)/users-api/logging.sh"
+            chmod +x "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
+          displayName: 'Make scripts executable'
 
-          - script: |
-              sed -i 's/\r$//' "$(Build.SourcesDirectory)/users-api/logging.sh"
-              sed -i 's/\r$//' "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
-            displayName: 'Fix line endings in scripts'
+        - script: |
+            sed -i 's/\r$//' "$(Build.SourcesDirectory)/users-api/logging.sh"
+            sed -i 's/\r$//' "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
+          displayName: 'Fix line endings in scripts'
 
-          - script: |
-              . "$(Build.SourcesDirectory)/users-api/logging.sh"
-              info_msg "Run logging script"
-            displayName: 'Run Logging Script'
+        - script: |
+            . "$(Build.SourcesDirectory)/users-api/logging.sh"
+            info_msg "Run logging script"
+          displayName: 'Run Logging Script'
 
-          - task: UsePythonVersion@0
-            inputs:
-              versionSpec: '3.x'
-              addToPath: true
+        - task: UsePythonVersion@0
+          inputs:
+            versionSpec: '3.x'
+            addToPath: true
 
-          - script: |
-              echo "== Debug file tree =="
-              find $(Build.SourcesDirectory) -type f
-            displayName: 'Debug: Show all files'
+        - task: Bash@3
+          name: setAppVersionStep
+          displayName: 'Set APP_VERSION output variable'
+          inputs:
+            targetType: 'inline'
+            script: |
+              VERSION_SCRIPT_PATH="$(Build.SourcesDirectory)/users-api/get_latest_version.py"
+              echo "=== Checking if version script exists ==="
+              if [ ! -f "$VERSION_SCRIPT_PATH" ]; then
+                echo "ERROR: Script not found at $VERSION_SCRIPT_PATH"
+                exit 1
+              fi
+              latest_version=$(python3 "$VERSION_SCRIPT_PATH")
+              echo "Extracted version: $latest_version"
+              if [ -z "$latest_version" ]; then
+                echo "APP_VERSION not retrieved. Exiting"
+                exit 3
+              fi
+              echo "##vso[task.setvariable variable=APP_VERSION;isOutput=true]$latest_version"
 
-          - task: Bash@3
-            name: setAppVersionStep
-            displayName: 'Set APP_VERSION output variable'
-            inputs:
-              targetType: 'inline'
-              script: |
-                VERSION_SCRIPT_PATH="$(Build.SourcesDirectory)/users-api/get_latest_version.py"
-                echo "Checking if version script exists at: $VERSION_SCRIPT_PATH"
+# === BUILD AND TEST ===
+- stage: BuildAndTest
+  displayName: 'Project: Build and Test'
+  dependsOn: PreBuild
+  condition: succeeded()
+  jobs:
+    - job: BuildAndTest
+      displayName: 'Build And Test'
+      steps:
+        - script: |
+            echo "== Compiling project =="
+            mkdir -p $(Build.ArtifactStagingDirectory)/build
+            echo "Compiled app binary" > $(Build.ArtifactStagingDirectory)/build/app.bin
+          displayName: 'Build Project'
 
-                if [ ! -f "$VERSION_SCRIPT_PATH" ]; then
-                  echo "ERROR: Script not found at $VERSION_SCRIPT_PATH"
-                  exit 1
-                fi
+        - task: PublishBuildArtifacts@1
+          inputs:
+            pathToPublish: '$(Build.ArtifactStagingDirectory)/build'
+            artifactName: 'build-artifact'
+            publishLocation: 'Container'
+          displayName: 'Publish Build Artifact'
 
-                echo "Running version script..."
-                python3 --version
-                latest_version=$(python3 "$VERSION_SCRIPT_PATH")
+        - script: |
+            echo "== Running Unit Tests =="
+            echo "Simulating unit tests..."
+            echo "All tests passed"
+          displayName: 'Run Unit Tests'
 
-                echo "Extracted version: $latest_version"
+# === DOCKER BUILD AND PUSH ===
+- stage: DockerBuildAndPush
+  displayName: 'Docker: Build and Push'
+  dependsOn: BuildAndTest
+  condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'main'))
+  variables:
+    appVersion: $[ stageDependencies.PreBuild.SetVersionJob.outputs['setAppVersionStep.APP_VERSION'] ]
+  jobs:
+    - job: BuildAndPush
+      displayName: 'Build and Push Docker Image'
+      steps:
+        - script: |
+            echo ">>> Docker Tag version: '$(appVersion)'"
+          displayName: 'Show appVersion'
 
-                if [ -z "$latest_version" ]; then
-                  echo "ERROR: APP_VERSION not retrieved. Exiting"
-                  exit 3
-                fi
+        - task: Docker@2
+          displayName: 'Build Docker Image'
+          inputs:
+            containerRegistry: 'sillerolena'
+            repository: 'sillerolena/lab4'
+            command: 'build'
+            Dockerfile: '$(Build.SourcesDirectory)/users-api/Dockerfile'
+            buildContext: '$(Build.SourcesDirectory)/users-api'
+            tags: |
+              $(appVersion)
 
-                echo "##vso[task.setvariable variable=APP_VERSION;isOutput=true]$latest_version"
+        - task: Docker@2
+          displayName: 'Push Docker Image'
+          inputs:
+            containerRegistry: 'sillerolena'
+            repository: 'sillerolena/lab4'
+            command: 'push'
+            tags: |
+              $(appVersion)
 
-  - stage: BuildAndTest
-    displayName: 'Project: Build and Test'
-    dependsOn: PreBuild
-    condition: succeeded()
-    jobs:
-      - job: BuildAndTest
-        displayName: 'Build And Test'
-        steps:
-          - script: |
-              echo "== Compiling project =="
-              mkdir -p $(Build.ArtifactStagingDirectory)/build
-              echo "Compiled app binary" > $(Build.ArtifactStagingDirectory)/build/app.bin
-            displayName: 'Build Project'
+# === HELM CHART PACK ===
+- stage: HelmChartPack
+  displayName: 'Helm Chart: Pack and Push'
+  dependsOn: DockerBuildAndPush
+  condition: succeeded()
+  jobs:
+    - job: PackAndPush
+      displayName: 'Pack and Push'
+      steps:
+        - script: |
+            echo "Packing and pushing Helm chart..."
+          displayName: 'Helm Chart Step'
 
-          - task: PublishBuildArtifacts@1
-            inputs:
-              pathToPublish: '$(Build.ArtifactStagingDirectory)/build'
-              artifactName: 'build-artifact'
-              publishLocation: 'Container'
-            displayName: 'Publish Build Artifact'
+# === POST-BUILD ===
+- stage: PostBuild
+  displayName: 'Post-Build'
+  dependsOn: HelmChartPack
+  condition: succeeded()
+  jobs:
+    - job: PostBuild
+      displayName: 'Post-Build'
+      steps:
+        - script: |
+            echo "Post-build cleanup or report step"
+          displayName: 'Post-Build Step'
 
-          - script: |
-              echo "== Running Unit Tests =="
-              echo "Simulating unit tests..."
-              echo "All tests passed"
-            displayName: 'Run Unit Tests'
- 
- 
-  - stage: DockerBuildAndPush
-    displayName: 'Docker: Build and Push'
-    dependsOn: BuildAndTest
-    condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'main'))
-    variables:
-      appVersion: $[ stageDependencies.PreBuild.SetVersionJob.outputs['setAppVersionStep.APP_VERSION'] ]
-    jobs:
-      - job: BuildAndPush
-        displayName: 'Build and Push Docker Image'
-        steps:
-          - script: |
-              echo "Docker Tag version: $(appVersion)"
-            displayName: 'Log appVersion'
-
-          - task: Docker@2
-            displayName: 'Build Docker Image'
-            inputs:
-              containerRegistry: 'sillerolena'
-              repository: 'sillerolena/lab4'
-              command: 'build'
-              Dockerfile: '$(Build.SourcesDirectory)/users-api/Dockerfile'
-              buildContext: '$(Build.SourcesDirectory)/users-api'
-              tags: $(appVersion)
-
-          - task: Docker@2
-            displayName: 'Push Docker Image'
-            inputs:
-              containerRegistry: 'sillerolena'
-              repository: 'sillerolena/lab4'
-              command: 'push'
-              tags: $(appVersion)
-
-  - stage: HelmChartPack
-    displayName: 'Helm Chart: Pack and Push'
-    dependsOn: DockerBuildAndPush
-    condition: succeeded()
-    jobs:
-      - job: PackAndPush
-        displayName: 'Pack and Push'
-        steps:
-          - script: |
-              echo "Packing and pushing Helm chart..."
-            displayName: 'Helm Chart Step'
-
-  - stage: PostBuild
-    displayName: 'Post-Build'
-    dependsOn: HelmChartPack
-    condition: succeeded()
-    jobs:
-      - job: PostBuild
-        displayName: 'Post-Build'
-        steps:
-          - script: |
-              echo "Post-build cleanup or report step"
-            displayName: 'Post-Build Step'
 
