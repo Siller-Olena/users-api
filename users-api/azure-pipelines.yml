@@ -29,7 +29,8 @@ stages:
           - checkout: self
             fetchDepth: 0
             persistCredentials: true
-
+          outputs:
+             setAppVersionStep.APP_VERSION: $[ steps.setAppVersionStep.outputs['APP_VERSION'] ]
           # Сделаем скрипты исполнимыми
           - script: |
               echo "Current directory:"
