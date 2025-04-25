@@ -54,21 +54,26 @@ stages:
               versionSpec: '3.x'
               addToPath: true
 
+          - script: |
+              echo "== Debug file tree =="
+              find $(Build.SourcesDirectory) -type f
+            displayName: 'Debug: Show all files'
+
           - task: Bash@3
             name: setAppVersionStep
             displayName: 'Set APP_VERSION output variable'
             inputs:
               targetType: 'inline'
               script: |
-                echo "=== Checking if version script exists ==="
                 VERSION_SCRIPT_PATH="$(Build.SourcesDirectory)/users-api/get_latest_version.py"
+                echo "Checking if version script exists at: $VERSION_SCRIPT_PATH"
 
                 if [ ! -f "$VERSION_SCRIPT_PATH" ]; then
                   echo "ERROR: Script not found at $VERSION_SCRIPT_PATH"
                   exit 1
                 fi
 
-                echo "=== Running version script ==="
+                echo "Running version script..."
                 python3 --version
                 latest_version=$(python3 "$VERSION_SCRIPT_PATH")
 
