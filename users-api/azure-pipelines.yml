@@ -118,7 +118,7 @@ stages:
               repository: 'sillerolena/lab4'
               command: 'build'
               Dockerfile: '$(Build.SourcesDirectory)/users-api/Dockerfile'   # теперь верный путь
-              buildContext: '$(Build.SourcesDirectory)'
+              buildContext: '$(Build.SourcesDirectory)/users-api'
               tags: |
                 $(Build.BuildId)
                 $(appVersion)
