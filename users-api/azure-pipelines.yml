@@ -112,7 +112,8 @@ stages:
               echo "Simulating unit tests..."
               echo "All tests passed"
             displayName: 'Run Unit Tests'
-
+ 
+ 
   - stage: DockerBuildAndPush
     displayName: 'Docker: Build and Push'
     dependsOn: BuildAndTest
