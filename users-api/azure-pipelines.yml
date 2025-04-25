@@ -103,7 +103,7 @@ stages:
 
   - stage: DockerBuildAndPush
     displayName: 'Docker: Build and Push'
-    dependsOn: PreBuild
+    dependsOn: BuildAndTest
     condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'main'))
     variables:
       appVersion: $[ stageDependencies.PreBuild.SetVersionJob.outputs['setAppVersionStep.APP_VERSION'] ]
@@ -117,7 +117,7 @@ stages:
               containerRegistry: 'sillerolena'
               repository: 'sillerolena/lab4'
               command: 'build'
-              Dockerfile: '$(Build.SourcesDirectory)/Dockerfile'   # теперь верный путь
+              Dockerfile: '$(Build.SourcesDirectory)/users-api/Dockerfile'   # теперь верный путь
               buildContext: '$(Build.SourcesDirectory)'
               tags: |
                 $(Build.BuildId)
