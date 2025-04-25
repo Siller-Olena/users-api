@@ -134,7 +134,7 @@ stages:
               command: 'build'
               Dockerfile: '$(Build.SourcesDirectory)/users-api/Dockerfile'
               buildContext: '$(Build.SourcesDirectory)/users-api'
-              tags: $(appVersion)  # Применяем тег из переменной
+              tags: $(appVersion)  
 
           # Публикация Docker образа
           - task: Docker@2
@@ -143,8 +143,7 @@ stages:
               containerRegistry: 'sillerolena'
               repository: 'sillerolena/lab4'
               command: 'push'
-              tags: |
-                $(appVersion)  # Применяем тег из переменной
+              tags: $(appVersion)  
 
   - stage: HelmChartPack
     displayName: 'Helm Chart: Pack and Push'
