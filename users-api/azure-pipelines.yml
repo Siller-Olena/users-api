@@ -20,12 +20,12 @@ pool:
 
 stages:
 
-# === PRE-BUILD ===
+# ======== PRE-BUILD: Извлечение версии ========
 - stage: PreBuild
   displayName: 'Pre-Build'
   jobs:
     - job: SetVersionJob
-      displayName: 'Pre-Build Analysis'
+      displayName: 'Извлечь версию приложения'
       steps:
         - checkout: self
           fetchDepth: 0
@@ -38,17 +38,17 @@ stages:
             ls -la
             chmod +x "$(Build.SourcesDirectory)/users-api/logging.sh"
             chmod +x "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
-          displayName: 'Make scripts executable'
+          displayName: 'Сделать скрипты исполняемыми'
 
         - script: |
             sed -i 's/\r$//' "$(Build.SourcesDirectory)/users-api/logging.sh"
             sed -i 's/\r$//' "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
-          displayName: 'Fix line endings in scripts'
+          displayName: 'Исправить окончания строк'
 
         - script: |
             . "$(Build.SourcesDirectory)/users-api/logging.sh"
             info_msg "Run logging script"
-          displayName: 'Run Logging Script'
+          displayName: 'Запуск логгера'
 
         - task: UsePythonVersion@0
           inputs:
@@ -57,69 +57,69 @@ stages:
 
         - task: Bash@3
           name: setAppVersionStep
-          displayName: 'Set APP_VERSION output variable'
+          displayName: 'Установить переменную APP_VERSION'
           inputs:
             targetType: 'inline'
             script: |
               VERSION_SCRIPT_PATH="$(Build.SourcesDirectory)/users-api/get_latest_version.py"
-              echo "=== Checking if version script exists ==="
+              echo "=== Проверка наличия скрипта версии ==="
               if [ ! -f "$VERSION_SCRIPT_PATH" ]; then
                 echo "ERROR: Script not found at $VERSION_SCRIPT_PATH"
                 exit 1
               fi
               latest_version=$(python3 "$VERSION_SCRIPT_PATH")
-              echo "Extracted version: $latest_version"
+              echo "Извлечённая версия: $latest_version"
               if [ -z "$latest_version" ]; then
-                echo "APP_VERSION not retrieved. Exiting"
+                echo "APP_VERSION не получена. Прерывание."
                 exit 3
               fi
               echo "##vso[task.setvariable variable=APP_VERSION;isOutput=true]$latest_version"
 
-# === BUILD AND TEST ===
+# ======== СБОРКА И ТЕСТЫ ========
 - stage: BuildAndTest
-  displayName: 'Project: Build and Test'
+  displayName: 'Сборка и тестирование'
   dependsOn: PreBuild
   condition: succeeded()
   jobs:
     - job: BuildAndTest
-      displayName: 'Build And Test'
+      displayName: 'Сборка и тесты'
       steps:
         - script: |
-            echo "== Compiling project =="
+            echo "== Компиляция проекта =="
             mkdir -p $(Build.ArtifactStagingDirectory)/build
             echo "Compiled app binary" > $(Build.ArtifactStagingDirectory)/build/app.bin
-          displayName: 'Build Project'
+          displayName: 'Сборка проекта'
 
         - task: PublishBuildArtifacts@1
           inputs:
             pathToPublish: '$(Build.ArtifactStagingDirectory)/build'
             artifactName: 'build-artifact'
             publishLocation: 'Container'
-          displayName: 'Publish Build Artifact'
+          displayName: 'Публикация артефактов сборки'
 
         - script: |
-            echo "== Running Unit Tests =="
-            echo "Simulating unit tests..."
-            echo "All tests passed"
-          displayName: 'Run Unit Tests'
+            echo "== Юнит-тесты =="
+            echo "Эмуляция тестов..."
+            echo "Все тесты пройдены"
+          displayName: 'Запуск юнит-тестов'
 
-# === DOCKER BUILD AND PUSH ===
+# ======== СБОРКА И PUSH DOCKER ========
 - stage: DockerBuildAndPush
-  displayName: 'Docker: Build and Push'
-  dependsOn: BuildAndTest
+  displayName: 'Docker: Сборка и Push'
+  dependsOn: PreBuild
   condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'main'))
   variables:
     appVersion: $[ stageDependencies.PreBuild.SetVersionJob.outputs['setAppVersionStep.APP_VERSION'] ]
   jobs:
     - job: BuildAndPush
-      displayName: 'Build and Push Docker Image'
+      displayName: 'Собрать и отправить Docker-образ'
       steps:
         - script: |
-            echo ">>> appVersion is: $(appVersion)"
-          displayName: 'Debug: Show appVersion'
+            echo "Docker Tag version: $(appVersion)"
+          displayName: 'Логируем версию appVersion'
 
         - task: Docker@2
-          displayName: 'Build Docker Image'
+          displayName: 'Сборка Docker-образа'
           inputs:
             containerRegistry: 'sillerolena'
             repository: 'sillerolena/lab4'
@@ -130,7 +130,7 @@ stages:
               $(appVersion)
 
         - task: Docker@2
-          displayName: 'Push Docker Image'
+          displayName: 'Push Docker-образа'
           inputs:
             containerRegistry: 'sillerolena'
             repository: 'sillerolena/lab4'
@@ -138,30 +138,29 @@ stages:
             tags: |
               $(appVersion)
 
-# === HELM CHART PACK ===
+# ======== HELM CHART ========
 - stage: HelmChartPack
-  displayName: 'Helm Chart: Pack and Push'
+  displayName: 'Helm Chart: Упаковка и Push'
   dependsOn: DockerBuildAndPush
   condition: succeeded()
   jobs:
     - job: PackAndPush
-      displayName: 'Pack and Push Helm Chart'
+      displayName: 'Упаковка и публикация Helm Chart'
       steps:
         - script: |
             echo "Packing and pushing Helm chart..."
-            helm package ./charts/mychart
-            helm push ./mychart-*.tgz oci://myacr.azurecr.io/charts
           displayName: 'Helm Chart Step'
 
-# === POST-BUILD ===
+# ======== POST-BUILD ========
 - stage: PostBuild
   displayName: 'Post-Build'
   dependsOn: HelmChartPack
   condition: succeeded()
   jobs:
     - job: PostBuild
-      displayName: 'Post-Build'
+      displayName: 'Финальные действия'
       steps:
         - script: |
             echo "Post-build cleanup or report step"
           displayName: 'Post-Build Step'
+
