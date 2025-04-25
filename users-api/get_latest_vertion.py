@@ -21,7 +21,11 @@ json_data = '''{
 # Загружаем JSON
 data = json.loads(json_data)
 
-# Извлекаем и выводим только версию
-print(data['results'][0]['name'])
+version = data['results'][0]['name']
 
+# Печатаем для отладки
+print(f"Extracted version: {version}")
+
+# Возвращаем версию как вывод для пайплайна
+print(version)
 
