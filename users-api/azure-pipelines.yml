@@ -25,12 +25,13 @@ stages:
     jobs:
       - job: SetVersionJob
         displayName: 'Pre-Build Analysis'
+        outputs:
+             setAppVersionStep.APP_VERSION: $[ steps.setAppVersionStep.outputs['APP_VERSION'] ]
         steps:
           - checkout: self
             fetchDepth: 0
             persistCredentials: true
-             outputs:
-             setAppVersionStep.APP_VERSION: $[ steps.setAppVersionStep.outputs['APP_VERSION'] ]
+             
           # Сделаем скрипты исполнимыми
           - script: |
               echo "Current directory:"
