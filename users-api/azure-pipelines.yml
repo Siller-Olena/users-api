@@ -43,12 +43,12 @@ stages:
             displayName: 'Make scripts executable'
           
           - script: |
-              sed -i 's/\r$//' "$(Build.SourcesDirectory)/logging.sh"
-              sed -i 's/\r$//' "$(Build.SourcesDirectory)/common-script/dockerhub.sh"
+              sed -i 's/\r$//' "$(Build.SourcesDirectory)/users-api/logging.sh"
+              sed -i 's/\r$//' "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
             displayName: 'Fix line endings in scripts'
 
           - script: |
-              . "$(Build.SourcesDirectory)/logging.sh"
+              . "$(Build.SourcesDirectory)/users-api/logging.sh"
               info_msg "Run logging script"
             displayName: 'Run Logging Script'
 
