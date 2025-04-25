@@ -18,11 +18,8 @@ json_data = '''{
     ]
 }'''
 
-# Завантажуємо JSON
 data = json.loads(json_data)
 
-# Витягування останньої версії
-latest_version = data['results'][0]['name']
+# Просто выводим версию, без лишнего текста
+print(data['results'][0]['name'])
 
-# Вивести останню версію
-print("Остання версія образу:", latest_version)
