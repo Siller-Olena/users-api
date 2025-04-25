@@ -66,7 +66,7 @@ stages:
                 latest_version=$(python3 $(Build.SourcesDirectory)/users-api/get_latest_vertion.py)
 
                 echo "latest_version=$latest_version"
-                if [ -z "$APP_VERSION" ]; then
+                if [ -z "$latest_version" ]; then
                   echo "APP_VERSION not retrieved. Exiting"
                   exit 3
                 fi
