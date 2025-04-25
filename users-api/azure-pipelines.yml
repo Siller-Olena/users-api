@@ -30,7 +30,10 @@ stages:
             fetchDepth: 0
             persistCredentials: true
 
+          
+
           - script: |
+              echo "$(ls)"
               chmod +x "$(Build.SourcesDirectory)/logging.sh"
               chmod +x "$(Build.SourcesDirectory)/common-script/dockerhub.sh"
             displayName: 'Make scripts executable'
