@@ -33,7 +33,11 @@ stages:
           
 
           - script: |
-              echo "$(ls)"
+              echo "Current directory:"
+              pwd
+
+              echo "Listing all files and folders:"
+              ls -la
               chmod +x "$(Build.SourcesDirectory)/logging.sh"
               chmod +x "$(Build.SourcesDirectory)/common-script/dockerhub.sh"
             displayName: 'Make scripts executable'
