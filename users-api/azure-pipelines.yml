@@ -25,7 +25,7 @@ stages:
   displayName: 'Pre-Build'
   jobs:
     - job: SetVersionJob
-      name: SetVersionJob
+      
       displayName: 'Pre-Build Analysis'
       steps:
         - checkout: self
