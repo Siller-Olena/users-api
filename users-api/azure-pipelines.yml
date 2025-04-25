@@ -63,7 +63,7 @@ stages:
             inputs:
               targetType: 'inline'
               script: |
-                latest_version=$(python3 $(Build.SourcesDirectory)/get_latest_vertion.py)
+                latest_version=$(python3 $(Build.SourcesDirectory)/users-api/get_latest_vertion.py)
 
                 echo "latest_version=$latest_version"
                 if [ -z "$latest_version" ]; then
