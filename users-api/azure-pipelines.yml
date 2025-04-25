@@ -66,7 +66,7 @@ stages:
               targetType: 'inline'
               script: |
                 APP_VERSION=$(python3 $(Build.SourcesDirectory)/users-api/get_latest_vertion.py)
-                echo "Extracted version: $APP_VERSION"
+                echo "APP_VERSION=$APP_VERSION"
                 if [ -z "$APP_VERSION" ]; then
                   echo "APP_VERSION not retrieved. Exiting"
                   exit 3
