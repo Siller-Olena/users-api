@@ -71,9 +71,7 @@ stages:
                 fi
                 echo "##vso[task.setvariable variable=APP_VERSION;isOutput=true]$APP_VERSION"
                 echo "APP_VERSION is set to $APP_VERSION"
-                - script: |
-              echo "APP_VERSION: $(setAppVersionStep.APP_VERSION)"
-            displayName: 'Log APP_VERSION'
+               
                
   - stage: BuildAndTest
     displayName: 'Project: Build and Test'
