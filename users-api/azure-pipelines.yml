@@ -73,7 +73,9 @@ stages:
                  fi
                 echo "##vso[task.setvariable variable=APP_VERSION;isOutput=true]$APP_VERSION"
                 echo "Set APP_VERSION: $APP_VERSION"
-                 
+         - script: |
+             echo "APP_VERSION inside PreBuild: $(APP_VERSION)"
+             displayName: 'Debug APP_VERSION in PreBuild'
 
   - stage: BuildAndTest
     displayName: 'Project: Build and Test'
@@ -115,8 +117,7 @@ stages:
           # Логируем версию для Docker
           - script: |
               echo "Docker Tag version: $(appVersion)"
-            displayName: 'Log appVersion'
-          - script: |
+              echo "appVersion = $(appVersion)"
               if [ -z "$(appVersion)" ]; then
                 echo "Error: APP_VERSION is empty. Exiting."
                 exit 1
