@@ -65,13 +65,13 @@ stages:
             inputs:
               targetType: 'inline'
               script: |
-                APP_VERSION=$(python3 $(Build.SourcesDirectory)/users-api/get_latest_vertion.py)
-                echo "APP_VERSION=$APP_VERSION"
-                if [ -z "$APP_VERSION" ]; then
+                latest_version=$(python3 $(Build.SourcesDirectory)/users-api/get_latest_vertion.py)
+                echo "Extracted version: $latest_version"
+                if [ -z "$latest_version" ]; then
                   echo "APP_VERSION not retrieved. Exiting"
                   exit 3
                 fi
-                echo "##vso[task.setvariable variable=APP_VERSION;isOutput=true]$APP_VERSION"
+                echo "##vso[task.setvariable variable=APP_VERSION;isOutput=true]$latest_version"
                 echo "APP_VERSION is set to $APP_VERSION"
 
   - stage: BuildAndTest
@@ -113,8 +113,8 @@ stages:
         steps:
           # Логируем версию для Docker
           - script: |
-              echo "APP_VERSION: $(appVersion)"
-            displayName: 'Log APP_VERSION'
+              echo "Docker Tag version: $(appVersion)"
+            displayName: 'Log appVersion'
 
           # Сборка Docker образа с тегом, который зависит от APP_VERSION
           - task: Docker@2
