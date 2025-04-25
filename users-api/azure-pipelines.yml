@@ -69,8 +69,7 @@ stages:
 
                 echo "##vso[task.setvariable variable=APP_VERSION;isOutput=true]$APP_VERSION"
                 echo "APP_VERSION is set to $APP_VERSION"
-                name: setAppVersionStep
-            displayName: 'Run get_latest_vertion.py'
+               
   - stage: BuildAndTest
     displayName: 'Project: Build and Test'
     dependsOn: PreBuild
