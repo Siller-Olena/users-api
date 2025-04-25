@@ -118,16 +118,6 @@ stages:
           - script: |
               echo "Stage-dependency appVersion: $(appVersion)"
               displayName: 'Check APP_VERSION from output'
-          
-          - job: BuildAndPush
-            dependsOn: SetVersionJob
-            variables:
-              appVersion: $[ stageDependencies.PreBuild.SetVersionJob.outputs['setAppVersionStep.APP_VERSION'] ]
-            steps:
-            - script: |
-                echo "Docker Tag version: $(appVersion)"
-                displayName: 'Log appVersion'
-    
           # Сборка Docker образа с тегом, который зависит от APP_VERSION
           - task: Docker@2
             displayName: 'Build Docker Image'
@@ -170,6 +160,5 @@ stages:
         steps:
           - script: |
               echo "Post-build cleanup or report step"
-            displayName: 'Post-Build Step'
-
+            displayName: 'Post-Build Step' 
 
