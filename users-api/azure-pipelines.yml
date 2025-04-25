@@ -123,7 +123,7 @@ stages:
               containerRegistry: 'sillerolena'
               repository: 'sillerolena/lab4'
               command: 'push'
-              tags: $(appVersion)
+              tags: $(appVersion.APP_VERSION)
 
   - stage: HelmChartPack
     displayName: 'Helm Chart: Pack and Push'
