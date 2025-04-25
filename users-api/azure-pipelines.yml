@@ -63,13 +63,9 @@ stages:
             inputs:
               targetType: 'inline'
               script: |
-                latest_version=$(python3 $(Build.SourcesDirectory)/users-api/get_latest_vertion.py)
+                APP_VERSION=$(python3 $(Build.SourcesDirectory)/users-api/get_latest_vertion.py)
 
-                echo "latest_version=$latest_version"
-                if [ -z "$latest_version" ]; then
-                  echo "APP_VERSION not retrieved. Exiting"
-                  exit 3
-                fi
+            
 
                 echo "##vso[task.setvariable variable=APP_VERSION;isOutput=true]$APP_VERSION"
                 echo "APP_VERSION is set to $APP_VERSION"
