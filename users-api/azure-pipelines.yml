@@ -22,12 +22,13 @@ stages:
 
   - stage: PreBuild
     displayName: 'Pre-Build'
-    jobs:
-      - job: SetVersionJob
-        displayName: 'Pre-Build Analysis'
-        outputs:
-             setAppVersionStep.APP_VERSION: $[ steps.setAppVersionStep.outputs['APP_VERSION'] ]
-        steps:
+   jobs:
+  - job: SetVersionJob
+    displayName: 'Pre-Build Analysis'
+    outputs:
+         setAppVersionStep.APP_VERSION: $[ steps.setAppVersionStep.outputs['APP_VERSION'] ]
+    steps:
+
           - checkout: self
             fetchDepth: 0
             persistCredentials: true
