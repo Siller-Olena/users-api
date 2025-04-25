@@ -64,8 +64,8 @@ stages:
               targetType: 'inline'
               script: |
                 APP_VERSION=$(python3 $(Build.SourcesDirectory)/users-api/get_latest_vertion.py)
-                echo "latest_version=$latest_version"
-                if [ -z "$latest_version" ]; then
+                echo "Extracted version: $APP_VERSION"
+                if [ -z "$APP_VERSION" ]; then
                 echo "APP_VERSION not retrieved. Exiting"
                 exit 3
                 fi
@@ -109,14 +109,17 @@ stages:
     jobs:
       - job: BuildAndPush
         displayName: 'Build and Push Docker Image'
-        steps:
+  
+          - script: |
+              echo "APP_VERSION: $(appVersion)"
+            displayName: 'Log APP_VERSION'
           - task: Docker@2
             displayName: 'Build Docker Image'
             inputs:
               containerRegistry: 'sillerolena'
               repository: 'sillerolena/lab4'
               command: 'build'
-              Dockerfile: '$(Build.SourcesDirectory)/users-api/Dockerfile'   # теперь верный путь
+              Dockerfile: '$(Build.SourcesDirectory)/users-api/Dockerfile'   
               buildContext: '$(Build.SourcesDirectory)/users-api'
               tags: $(appVersion)
 
