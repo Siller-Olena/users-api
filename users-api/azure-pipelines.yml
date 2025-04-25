@@ -64,11 +64,16 @@ stages:
               targetType: 'inline'
               script: |
                 APP_VERSION=$(python3 $(Build.SourcesDirectory)/users-api/get_latest_vertion.py)
-                echo "Extracted version: $APP_VERSION"
-            
-
+                echo "latest_version=$latest_version"
+                if [ -z "$latest_version" ]; then
+                echo "APP_VERSION not retrieved. Exiting"
+                exit 3
+                fi
                 echo "##vso[task.setvariable variable=APP_VERSION;isOutput=true]$APP_VERSION"
                 echo "APP_VERSION is set to $APP_VERSION"
+                - script: |
+              echo "APP_VERSION: $(setAppVersionStep.APP_VERSION)"
+            displayName: 'Log APP_VERSION'
                
   - stage: BuildAndTest
     displayName: 'Project: Build and Test'
@@ -115,7 +120,7 @@ stages:
               command: 'build'
               Dockerfile: '$(Build.SourcesDirectory)/users-api/Dockerfile'   # теперь верный путь
               buildContext: '$(Build.SourcesDirectory)/users-api'
-              tags: $(setAppVersionStep)
+              tags: $(setAppVersionStep.APP_VERSION)
 
           - task: Docker@2
             displayName: 'Push Docker Image'
@@ -123,7 +128,7 @@ stages:
               containerRegistry: 'sillerolena'
               repository: 'sillerolena/lab4'
               command: 'push'
-              tags: $(setAppVersionStep)
+              tags: $(setAppVersionStep.APP_VERSION)
 
   - stage: HelmChartPack
     displayName: 'Helm Chart: Pack and Push'
