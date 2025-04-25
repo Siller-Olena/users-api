@@ -21,11 +21,32 @@ json_data = '''{
 # Загружаем JSON
 data = json.loads(json_data)
 
-version = data['results'][0]['name']
+import json
 
-# Печатаем для отладки
-print(f"Extracted version: {version}")
+json_data = '''{
+    "count": 1,
+    "results": [
+        {
+            "name": "0.0.2",
+            "repository": 26690759,
+            "full_size": 93886610,
+            "images": [
+                {
+                    "architecture": "amd64",
+                    "digest": "sha256:410083298a7cb28925c445ff5ef2311902ac94df11adfcc0d9e1560df4d182b6",
+                    "os": "linux"
+                }
+            ]
+        }
+    ]
+}'''
 
-# Возвращаем версию как вывод для пайплайна
-print(version)
+# Загружаем JSON
+data = json.loads(json_data)
+
+# Проверяем, есть ли данные в results
+if len(data['results']) > 0:
+    print(data['results'][0]['name'])
+else:
+    print("Error: No version data found!")
 
