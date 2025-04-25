@@ -29,7 +29,7 @@ stages:
           - checkout: self
             fetchDepth: 0
             persistCredentials: true
-             
+
           # Сделаем скрипты исполнимыми
           - script: |
               echo "Current directory:"
@@ -65,18 +65,14 @@ stages:
             inputs:
               targetType: 'inline'
               script: |
-                APP_VERSION=$(python3 $(Build.SourcesDirectory)/users-api/get_latest_vertion.py)
-                echo "Extracted version: $APP_VERSION"
-                if [ -z "$APP_VERSION" ]; then
+                latest_version=$(python3 $(Build.SourcesDirectory)/users-api/get_latest_vertion.py)
+                echo "Extracted version: $latest_version"
+                if [ -z "$latest_version" ]; then
                   echo "APP_VERSION not retrieved. Exiting"
                   exit 3
                 fi
-                echo "##vso[task.setvariable variable=APP_VERSION;isOutput=true]$APP_VERSION"
-                echo "Set APP_VERSION: $APP_VERSION"
-
-    # Output переменной APP_VERSION для использования в последующих этапах
-    outputs:
-      setAppVersionStep.APP_VERSION: $[ steps.setAppVersionStep.outputs['APP_VERSION'] ]
+                echo "##vso[task.setvariable variable=APP_VERSION;isOutput=true]$latest_version"
+                echo "APP_VERSION is set to $APP_VERSION"
 
   - stage: BuildAndTest
     displayName: 'Project: Build and Test'
@@ -118,14 +114,7 @@ stages:
           # Логируем версию для Docker
           - script: |
               echo "Docker Tag version: $(appVersion)"
-              echo "appVersion = $(appVersion)"
-              if [ -z "$(appVersion)" ]; then
-                echo "Error: APP_VERSION is empty. Exiting."
-                exit 1
-              else
-                echo "Using Docker tag: $(appVersion)"
-              fi
-            displayName: 'Check appVersion for Docker tag'
+            displayName: 'Log appVersion'
 
           # Сборка Docker образа с тегом, который зависит от APP_VERSION
           - task: Docker@2
@@ -136,7 +125,7 @@ stages:
               command: 'build'
               Dockerfile: '$(Build.SourcesDirectory)/users-api/Dockerfile'
               buildContext: '$(Build.SourcesDirectory)/users-api'
-              tags: $(appVersion)
+              tags: $(appVersion)  # Применяем тег из переменной
 
           # Публикация Docker образа
           - task: Docker@2
@@ -145,7 +134,7 @@ stages:
               containerRegistry: 'sillerolena'
               repository: 'sillerolena/lab4'
               command: 'push'
-              tags: $(appVersion)
+              tags: $(appVersion)  # Применяем тег из переменной
 
   - stage: HelmChartPack
     displayName: 'Helm Chart: Pack and Push'
@@ -170,6 +159,5 @@ stages:
           - script: |
               echo "Post-build cleanup or report step"
             displayName: 'Post-Build Step'
-
 
 
