@@ -119,7 +119,7 @@ stages:
               command: 'build'
               Dockerfile: '$(Build.SourcesDirectory)/users-api/Dockerfile'   # теперь верный путь
               buildContext: '$(Build.SourcesDirectory)/users-api'
-              tags: $(APP_VERSION)
+              tags: $(appVersion)
 
           - task: Docker@2
             displayName: 'Push Docker Image'
@@ -127,7 +127,7 @@ stages:
               containerRegistry: 'sillerolena'
               repository: 'sillerolena/lab4'
               command: 'push'
-              tags: $(APP_VERSION)
+              tags: $(appVersion)
 
   - stage: HelmChartPack
     displayName: 'Helm Chart: Pack and Push'
