@@ -72,7 +72,7 @@ stages:
                  exit 3
                  fi
                 echo "##vso[task.setvariable variable=APP_VERSION;isOutput=true]$APP_VERSION"
-                
+                echo "Set APP_VERSION: $APP_VERSION"
                  
 
   - stage: BuildAndTest
@@ -124,7 +124,7 @@ stages:
                 echo "Using Docker tag: $(appVersion)"
               fi
             displayName: 'Check appVersion for Docker tag'
-            
+
           # Сборка Docker образа с тегом, который зависит от APP_VERSION
           - task: Docker@2
             displayName: 'Build Docker Image'
