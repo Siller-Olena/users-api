@@ -30,7 +30,6 @@ stages:
             fetchDepth: 0
             persistCredentials: true
 
-          # Сделаем скрипты исполнимыми
           - script: |
               echo "Current directory:"
               pwd
@@ -40,39 +39,47 @@ stages:
               chmod +x "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
             displayName: 'Make scripts executable'
 
-          # Исправим окончания строк
           - script: |
               sed -i 's/\r$//' "$(Build.SourcesDirectory)/users-api/logging.sh"
               sed -i 's/\r$//' "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
             displayName: 'Fix line endings in scripts'
 
-          # Запуск логирования
           - script: |
               . "$(Build.SourcesDirectory)/users-api/logging.sh"
               info_msg "Run logging script"
             displayName: 'Run Logging Script'
 
-          # Установка Python
           - task: UsePythonVersion@0
             inputs:
               versionSpec: '3.x'
               addToPath: true
 
-          # Запуск Python скрипта для получения версии
           - task: Bash@3
             name: setAppVersionStep
             displayName: 'Set APP_VERSION output variable'
             inputs:
               targetType: 'inline'
               script: |
-                latest_version=$(python3 $(Build.SourcesDirectory)/users-api/get_latest_vertion.py)
+                echo "=== Checking if version script exists ==="
+                VERSION_SCRIPT_PATH="$(Build.SourcesDirectory)/users-api/get_latest_version.py"
+
+                if [ ! -f "$VERSION_SCRIPT_PATH" ]; then
+                  echo "ERROR: Script not found at $VERSION_SCRIPT_PATH"
+                  exit 1
+                fi
+
+                echo "=== Running version script ==="
+                python3 --version
+                latest_version=$(python3 "$VERSION_SCRIPT_PATH")
+
                 echo "Extracted version: $latest_version"
+
                 if [ -z "$latest_version" ]; then
-                  echo "APP_VERSION not retrieved. Exiting"
+                  echo "ERROR: APP_VERSION not retrieved. Exiting"
                   exit 3
                 fi
+
                 echo "##vso[task.setvariable variable=APP_VERSION;isOutput=true]$latest_version"
-              
 
   - stage: BuildAndTest
     displayName: 'Project: Build and Test'
@@ -111,14 +118,10 @@ stages:
       - job: BuildAndPush
         displayName: 'Build and Push Docker Image'
         steps:
-          # Логируем версию для Docker
           - script: |
               echo "Docker Tag version: $(appVersion)"
             displayName: 'Log appVersion'
-          - script: |
-              echo "Stage-dependency appVersion: $(appVersion)"
-              displayName: 'Check APP_VERSION from output'
-          # Сборка Docker образа с тегом, который зависит от APP_VERSION
+
           - task: Docker@2
             displayName: 'Build Docker Image'
             inputs:
@@ -127,16 +130,15 @@ stages:
               command: 'build'
               Dockerfile: '$(Build.SourcesDirectory)/users-api/Dockerfile'
               buildContext: '$(Build.SourcesDirectory)/users-api'
-              tags: $(appVersion)  # Применяем тег из переменной
+              tags: $(appVersion)
 
-          # Публикация Docker образа
           - task: Docker@2
             displayName: 'Push Docker Image'
             inputs:
               containerRegistry: 'sillerolena'
               repository: 'sillerolena/lab4'
               command: 'push'
-              tags: $(appVersion)  # Применяем тег из переменной
+              tags: $(appVersion)
 
   - stage: HelmChartPack
     displayName: 'Helm Chart: Pack and Push'
@@ -160,5 +162,5 @@ stages:
         steps:
           - script: |
               echo "Post-build cleanup or report step"
-            displayName: 'Post-Build Step' 
+            displayName: 'Post-Build Step'
 
