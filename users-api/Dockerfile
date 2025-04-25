@@ -21,10 +21,10 @@ RUN pip install alembic
 ENV PYTHONUNBUFFERED=1
 
 # Führe Alembic-Migrationen aus
-RUN alembic upgrade head
+#RUN alembic upgrade head
 
 # Expose port 5000 for the Flask app
 EXPOSE 5000
 
 # Run alembic upgrade when the container starts
-CMD ["sh", "-c", "alembic upgrade head && uvicorn src.main:app --host=0.0.0.0 --port=8000"]
+CMD ["sh", "-c", "uvicorn src.main:app --host=0.0.0.0 --port=8000"]
