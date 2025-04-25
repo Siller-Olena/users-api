@@ -116,7 +116,15 @@ stages:
           - script: |
               echo "Docker Tag version: $(appVersion)"
             displayName: 'Log appVersion'
-
+          - script: |
+              if [ -z "$(appVersion)" ]; then
+                echo "Error: APP_VERSION is empty. Exiting."
+                exit 1
+              else
+                echo "Using Docker tag: $(appVersion)"
+              fi
+            displayName: 'Check appVersion for Docker tag'
+            
           # Сборка Docker образа с тегом, который зависит от APP_VERSION
           - task: Docker@2
             displayName: 'Build Docker Image'
