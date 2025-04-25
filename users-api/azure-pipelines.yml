@@ -38,8 +38,8 @@ stages:
 
               echo "Listing all files and folders:"
               ls -la
-              chmod +x "$(Build.SourcesDirectory)/logging.sh"
-              chmod +x "$(Build.SourcesDirectory)/common-script/dockerhub.sh"
+              chmod +x "$(Build.SourcesDirectory)/users-api/logging.sh"
+              chmod +x "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
             displayName: 'Make scripts executable'
           
           - script: |
