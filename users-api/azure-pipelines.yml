@@ -36,8 +36,10 @@ stages:
     artifactName: "build-artifact"  # Передаем имя артефакта
     vmPool: 'Azure Pipelines'
     vmImage: 'ubuntu-latest'
-     script: |
-    echo "##vso[task.setvariable variable=appVersion;isOutput=true]$(APP_VERSION)"
+
+    # Добавляем скрипт для установки версии
+    script: |
+      echo "##vso[task.setvariable variable=appVersion;isOutput=true]$(APP_VERSION)"
     name: setAppVersionOutput
 
 # ======== СБОРКА И ТЕСТЫ ========
@@ -55,7 +57,7 @@ stages:
       someSetting: 'value'
 
 # ======== СБОРКА И PUSH DOCKER ========
--- template: templates/stages/docker/dockerBuildAndPush.yaml@ci-common-templates
+- template: templates/stages/docker/dockerBuildAndPush.yaml@ci-common-templates
   parameters:
     serviceName: $(ServiceName)
     dockerfilePath: "$(Build.SourcesDirectory)/users-api/Dockerfile"
@@ -78,6 +80,7 @@ stages:
           displayName: 'Helm Chart Step'
 
 # ======== POST-BUILD ========
+# Оставляем как было
 - stage: PostBuild
   displayName: 'Post-Build'
   dependsOn: HelmChartPack
