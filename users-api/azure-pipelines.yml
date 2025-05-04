@@ -1,3 +1,10 @@
+resources:
+  repositories:
+    - repository: ci-common-templates
+      type: git
+      name: ci-templates/templates/build-n-test
+      ref: 'refs/heads/main'
+
 trigger:
   branches:
     include:
@@ -21,122 +28,41 @@ pool:
 stages:
 
 # ======== PRE-BUILD: Извлечение версии ========
-- stage: PreBuild
-  displayName: 'Pre-Build'
-  jobs:
-    - job: SetVersionJob
-      displayName: 'Извлечь версию приложения'
-      steps:
-        - checkout: self
-          fetchDepth: 0
-          persistCredentials: true
-
-        - script: |
-            echo "Current directory:"
-            pwd
-            echo "Listing all files and folders:"
-            ls -la
-            chmod +x "$(Build.SourcesDirectory)/users-api/logging.sh"
-            chmod +x "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
-          displayName: 'Сделать скрипты исполняемыми'
-
-        - script: |
-            sed -i 's/\r$//' "$(Build.SourcesDirectory)/users-api/logging.sh"
-            sed -i 's/\r$//' "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
-          displayName: 'Исправить окончания строк'
-
-        - script: |
-            . "$(Build.SourcesDirectory)/users-api/logging.sh"
-            info_msg "Run logging script"
-          displayName: 'Запуск логгера'
-
-        - task: UsePythonVersion@0
-          inputs:
-            versionSpec: '3.x'
-            addToPath: true
-
-        - task: Bash@3
-          name: setAppVersionStep
-          displayName: 'Установить переменную APP_VERSION'
-          inputs:
-            targetType: 'inline'
-            script: |
-              VERSION_SCRIPT_PATH="$(Build.SourcesDirectory)/users-api/get_latest_version.py"
-              echo "=== Проверка наличия скрипта версии ==="
-              if [ ! -f "$VERSION_SCRIPT_PATH" ]; then
-                echo "ERROR: Script not found at $VERSION_SCRIPT_PATH"
-                exit 1
-              fi
-              latest_version=$(python3 "$VERSION_SCRIPT_PATH")
-              echo "Извлечённая версия: $latest_version"
-              if [ -z "$latest_version" ]; then
-                echo "APP_VERSION не получена. Прерывание."
-                exit 3
-              fi
-              echo "##vso[task.setvariable variable=APP_VERSION;isOutput=true]$latest_version"
+# Pre-Build stage через шаблон
+- template: templates/stages/build-n-test/v1.yaml@ci-common-templates
+  parameters:
+    ServiceName: $(ServiceName)
+    versionScriptPath: "$(Build.SourcesDirectory)/users-api/get_latest_version.py"
+    artifactName: "build-artifact"  # Передаем имя артефакта
+    vmPool: 'Azure Pipelines'
+    vmImage: 'ubuntu-latest'
+     script: |
+    echo "##vso[task.setvariable variable=appVersion;isOutput=true]$(APP_VERSION)"
+    name: setAppVersionOutput
 
 # ======== СБОРКА И ТЕСТЫ ========
 - stage: BuildAndTest
   displayName: 'Сборка и тестирование'
   dependsOn: PreBuild
   condition: succeeded()
-  jobs:
-    - job: BuildAndTest
-      displayName: 'Сборка и тесты'
-      steps:
-        - script: |
-            echo "== Компиляция проекта =="
-            mkdir -p $(Build.ArtifactStagingDirectory)/build
-            echo "Compiled app binary" > $(Build.ArtifactStagingDirectory)/build/app.bin
-          displayName: 'Сборка проекта'
-
-        - task: PublishBuildArtifacts@1
-          inputs:
-            pathToPublish: '$(Build.ArtifactStagingDirectory)/build'
-            artifactName: 'build-artifact'
-            publishLocation: 'Container'
-          displayName: 'Публикация артефактов сборки'
-
-        - script: |
-            echo "== Юнит-тесты =="
-            echo "Эмуляция тестов..."
-            echo "Все тесты пройдены"
-          displayName: 'Запуск юнит-тестов'
+  variables:
+    appVersion: $[stageDependencies.PreBuild.SetVersionJob.outputs['setAppVersionOutput.appVersion']]  # Получаем значение из PreBuild
+  template: templates/stages/build-n-test/v2.yaml@ci-common-templates
+  parameters:
+    appVersion: $(appVersion)
+    artifactName: 'build-artifact'
+    buildSettings:
+      someSetting: 'value'
 
 # ======== СБОРКА И PUSH DOCKER ========
-- stage: DockerBuildAndPush
-  displayName: 'Docker: Сборка и Push'
-  dependsOn: PreBuild
-  condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'main'))
-  variables:
-    appVersion: $[ stageDependencies.PreBuild.SetVersionJob.outputs['setAppVersionStep.APP_VERSION'] ]
-  jobs:
-    - job: BuildAndPush
-      displayName: 'Собрать и отправить Docker-образ'
-      steps:
-        - script: |
-            echo "Docker Tag version: $(appVersion)"
-          displayName: 'Логируем версию appVersion'
-
-        - task: Docker@2
-          displayName: 'Сборка Docker-образа'
-          inputs:
-            containerRegistry: 'sillerolena'
-            repository: 'sillerolena/lab4'
-            command: 'build'
-            Dockerfile: '$(Build.SourcesDirectory)/users-api/Dockerfile'
-            buildContext: '$(Build.SourcesDirectory)/users-api'
-            tags: |
-              $(appVersion)
-
-        - task: Docker@2
-          displayName: 'Push Docker-образа'
-          inputs:
-            containerRegistry: 'sillerolena'
-            repository: 'sillerolena/lab4'
-            command: 'push'
-            tags: |
-              $(appVersion)
+-- template: templates/stages/docker/dockerBuildAndPush.yaml@ci-common-templates
+  parameters:
+    serviceName: $(ServiceName)
+    dockerfilePath: "$(Build.SourcesDirectory)/users-api/Dockerfile"
+    buildContext: "$(Build.SourcesDirectory)/users-api"
+    dockerRegistry: 'sillerolena'  # Укажите свой контейнерный реестр
+    repository: 'sillerolena/lab4'  # Репозиторий, куда будет отправляться образ
+    tags: "$(appVersion)"
 
 # ======== HELM CHART ========
 - stage: HelmChartPack
