@@ -1,16 +1,19 @@
+# Подключаем общий репозиторий с шаблонами
 resources:
   repositories:
     - repository: ci-common-templates
       type: git
-      name: ci-templates
+      name: olenasiller/ci-templates  # <-- тут имя проекта/репозитория на твоём Azure DevOps
       ref: 'refs/heads/main'
 
+# Триггер на нужные ветки
 trigger:
   branches:
     include:
       - main
       - feature/*
 
+# Общие переменные
 variables:
   - group: 'DockerCredentials'
   - name: DockerId
@@ -22,90 +25,66 @@ variables:
   - name: ServiceName
     value: "$(DOCKER_REPO)"
 
+# Используем агент
 pool:
   vmImage: 'ubuntu-latest'
 
-stages:
-  # ======== PRE-BUILD: Извлечение версии ========
-  - stage: PreBuild
-    displayName: 'Pre-Build: Извлечение версии'
-    jobs:
-      - job: SetVersionJob
-        displayName: 'Извлечь версию приложения'
-        steps:
-          - script: |
-              VERSION_SCRIPT_PATH="$(Build.SourcesDirectory)/users-api/get_latest_version.py"
-              echo "=== Проверка наличия скрипта версии ==="
-              if [ ! -f "$VERSION_SCRIPT_PATH" ]; then
-                echo "ERROR: Script not found at $VERSION_SCRIPT_PATH"
-                exit 1
-              fi
-              latest_version=$(python3 "$VERSION_SCRIPT_PATH")
-              echo "Извлечённая версия: $latest_version"
-              if [ -z "$latest_version" ]; then
-                echo "APP_VERSION не получена. Прерывание."
-                exit 3
-              fi
-              echo "##vso[task.setvariable variable=APP_VERSION;isOutput=true]$latest_version"   
-            displayName: 'Извлечение версии приложения'
+# ======== PRE-BUILD: Извлечение версии ========
+- template: templates/stages/build-n-test/v1.yaml@ci-common-templates
+  parameters:
+    serviceName: $(ServiceName)
+    versionScriptPath: "$(Build.SourcesDirectory)/users-api/get_latest_version.py"
+    artifactName: "build-artifact"
+    vmPool: 'Azure Pipelines'
+    vmImage: 'ubuntu-latest'
 
-  # ======== СБОРКА И ТЕСТЫ ========
-  - stage: BuildAndTest
-    displayName: 'Сборка и тестирование'
-    dependsOn: PreBuild
-    condition: succeeded()
-    jobs:
-      - job: BuildJob
-        displayName: 'Сборка приложения'
-        steps:
-          - template: templates/stages/build-n-test/v2.yaml@ci-common-templates
-            parameters:
-              appVersion: $(appVersion)
-              artifactName: 'build-artifact'
-              buildSettings:
-                someSetting: 'value'
+# ======== СБОРКА И ТЕСТЫ ========
+- stage: BuildAndTest
+  displayName: 'Сборка и тестирование'
+  dependsOn: PreBuild
+  condition: succeeded()
+  variables:
+    appVersion: $[stageDependencies.PreBuild.SetVersionJob.outputs['setAppVersionStep.APP_VERSION']]
+  template: templates/stages/build-n-test/v2.yaml@ci-common-templates
+  parameters:
+    appVersion: $(appVersion)
+    artifactName: 'build-artifact'
+    buildSettings:
+      someSetting: 'value'
 
-  # ======== СБОРКА И PUSH DOCKER ========
-  - stage: DockerBuildAndPush
-    displayName: 'Сборка и Push Docker образа'
-    dependsOn: BuildAndTest
-    condition: succeeded()
-    jobs:
-      - job: DockerJob
-        displayName: 'Сборка и Push Docker образа'
-        steps:
-          - template: templates/stages/docker/dockerBuildAndPush.yaml@ci-common-templates
-            parameters:
-              serviceName: $(ServiceName)
-              dockerfilePath: "$(Build.SourcesDirectory)/users-api/Dockerfile"
-              buildContext: "$(Build.SourcesDirectory)/users-api"
-              dockerRegistry: 'sillerolena'
-              repository: 'sillerolena/lab4'
-              tags: "$(appVersion)"
+# ======== DOCKER BUILD & PUSH ========
+- template: templates/stages/docker/build-n-push/v1.yaml@ci-common-templates
+  parameters:
+    serviceName: $(ServiceName)
+    dockerfilePath: "$(Build.SourcesDirectory)/users-api/Dockerfile"
+    buildContext: "$(Build.SourcesDirectory)/users-api"
+    dockerRegistry: 'sillerolena'
+    repository: 'sillerolena/lab4'
+    tags: "$(appVersion)"
 
-  # ======== HELM CHART ========
-  - stage: HelmChartPack
-    displayName: 'Helm Chart: Упаковка и Push'
-    dependsOn: DockerBuildAndPush
-    condition: succeeded()
-    jobs:
-      - job: PackAndPush
-        displayName: 'Упаковка и публикация Helm Chart'
-        steps:
-          - script: |
-              echo "Packing and pushing Helm chart..."
-            displayName: 'Helm Chart Step'
+# ======== HELM CHART ========
+- stage: HelmChartPack
+  displayName: 'Helm Chart: Упаковка и Push'
+  dependsOn: DockerBuildAndPush
+  condition: succeeded()
+  jobs:
+    - job: PackAndPush
+      displayName: 'Упаковка и публикация Helm Chart'
+      steps:
+        - script: |
+            echo "Packing and pushing Helm chart..."
+          displayName: 'Helm Chart Step'
 
-  # ======== POST-BUILD ========
-  - stage: PostBuild
-    displayName: 'Post-Build'
-    dependsOn: HelmChartPack
-    condition: succeeded()
-    jobs:
-      - job: PostBuild
-        displayName: 'Финальные действия'
-        steps:
-          - script: |
-              echo "Post-build cleanup or report step"
-            displayName: 'Post-Build Step'
+# ======== POST-BUILD ========
+- stage: PostBuild
+  displayName: 'Post-Build'
+  dependsOn: HelmChartPack
+  condition: succeeded()
+  jobs:
+    - job: PostBuild
+      displayName: 'Финальные действия'
+      steps:
+        - script: |
+            echo "Post-build cleanup or report step"
+          displayName: 'Post-Build Step'
 
