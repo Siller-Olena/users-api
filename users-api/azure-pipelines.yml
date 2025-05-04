@@ -28,7 +28,6 @@ pool:
 stages:
 
 # ======== PRE-BUILD: Извлечение версии ========
-# Pre-Build stage через шаблон
 - template: templates/stages/build-n-test/v1.yaml@ci-common-templates
   parameters:
     ServiceName: $(ServiceName)
@@ -36,11 +35,6 @@ stages:
     artifactName: "build-artifact"  # Передаем имя артефакта
     vmPool: 'Azure Pipelines'
     vmImage: 'ubuntu-latest'
-
-    # Добавляем скрипт для установки версии
-    script: |
-      echo "##vso[task.setvariable variable=appVersion;isOutput=true]$(APP_VERSION)"
-    name: setAppVersionOutput
 
 # ======== СБОРКА И ТЕСТЫ ========
 - stage: BuildAndTest
@@ -62,8 +56,8 @@ stages:
     serviceName: $(ServiceName)
     dockerfilePath: "$(Build.SourcesDirectory)/users-api/Dockerfile"
     buildContext: "$(Build.SourcesDirectory)/users-api"
-    dockerRegistry: 'sillerolena'  # Укажите свой контейнерный реестр
-    repository: 'sillerolena/lab4'  # Репозиторий, куда будет отправляться образ
+    dockerRegistry: 'sillerolena'
+    repository: 'sillerolena/lab4'
     tags: "$(appVersion)"
 
 # ======== HELM CHART ========
@@ -80,7 +74,6 @@ stages:
           displayName: 'Helm Chart Step'
 
 # ======== POST-BUILD ========
-# Оставляем как было
 - stage: PostBuild
   displayName: 'Post-Build'
   dependsOn: HelmChartPack
