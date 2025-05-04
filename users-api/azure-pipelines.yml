@@ -1,19 +1,16 @@
-# Подключаем общий репозиторий с шаблонами
 resources:
   repositories:
     - repository: ci-common-templates
       type: git
-      name: olenasiller/ci-templates  # <-- тут имя проекта/репозитория на твоём Azure DevOps
+      name: ci-templates
       ref: 'refs/heads/main'
 
-# Триггер на нужные ветки
 trigger:
   branches:
     include:
       - main
       - feature/*
 
-# Общие переменные
 variables:
   - group: 'DockerCredentials'
   - name: DockerId
@@ -25,42 +22,50 @@ variables:
   - name: ServiceName
     value: "$(DOCKER_REPO)"
 
-# Используем агент
 pool:
   vmImage: 'ubuntu-latest'
 
+stages:
+
 # ======== PRE-BUILD: Извлечение версии ========
-- template: templates/stages/build-n-test/v1.yaml@ci-common-templates
-  parameters:
-    serviceName: $(ServiceName)
-    versionScriptPath: "$(Build.SourcesDirectory)/users-api/get_latest_version.py"
-    artifactName: "build-artifact"
-    vmPool: 'Azure Pipelines'
-    vmImage: 'ubuntu-latest'
+- stage: PreBuild
+  displayName: 'Pre-Build'
+  jobs:
+    - template: templates/stages/build-n-test/v1.yaml@ci-common-templates
+      parameters:
+        serviceName: $(ServiceName)
+        versionScriptPath: "$(Build.SourcesDirectory)/users-api/get_latest_version.py"
+        artifactName: "build-artifact"
+        vmPool: 'Azure Pipelines'
+        vmImage: 'ubuntu-latest'
 
 # ======== СБОРКА И ТЕСТЫ ========
 - stage: BuildAndTest
   displayName: 'Сборка и тестирование'
   dependsOn: PreBuild
   condition: succeeded()
-  variables:
-    appVersion: $[stageDependencies.PreBuild.SetVersionJob.outputs['setAppVersionStep.APP_VERSION']]
-  template: templates/stages/build-n-test/v2.yaml@ci-common-templates
-  parameters:
-    appVersion: $(appVersion)
-    artifactName: 'build-artifact'
-    buildSettings:
-      someSetting: 'value'
+  jobs:
+    - template: templates/stages/build-n-test/v2.yaml@ci-common-templates
+      parameters:
+        appVersion: "$(APP_VERSION)"
+        artifactName: "build-artifact"
+        buildSettings:
+          someSetting: 'value'
 
-# ======== DOCKER BUILD & PUSH ========
-- template: templates/stages/docker/build-n-push/v1.yaml@ci-common-templates
-  parameters:
-    serviceName: $(ServiceName)
-    dockerfilePath: "$(Build.SourcesDirectory)/users-api/Dockerfile"
-    buildContext: "$(Build.SourcesDirectory)/users-api"
-    dockerRegistry: 'sillerolena'
-    repository: 'sillerolena/lab4'
-    tags: "$(appVersion)"
+# ======== СБОРКА И PUSH DOCKER ========
+- stage: DockerBuildAndPush
+  displayName: 'Docker Build & Push'
+  dependsOn: BuildAndTest
+  condition: succeeded()
+  jobs:
+    - template: templates/stages/docker/dockerBuildAndPush.yaml@ci-common-templates
+      parameters:
+        serviceName: $(ServiceName)
+        dockerfilePath: "$(Build.SourcesDirectory)/users-api/Dockerfile"
+        buildContext: "$(Build.SourcesDirectory)/users-api"
+        dockerRegistry: 'sillerolena'
+        repository: 'sillerolena/lab4'
+        tags: "$(APP_VERSION)"
 
 # ======== HELM CHART ========
 - stage: HelmChartPack
@@ -87,4 +92,3 @@ pool:
         - script: |
             echo "Post-build cleanup or report step"
           displayName: 'Post-Build Step'
-
