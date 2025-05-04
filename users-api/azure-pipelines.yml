@@ -2,7 +2,7 @@ resources:
   repositories:
     - repository: ci-common-templates
       type: git
-      name: ci-templates/templates/build-n-test
+      name: ci-templates
       ref: 'refs/heads/main'
 
 trigger:
