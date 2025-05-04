@@ -1,10 +1,3 @@
-resources:
-  repositories:
-    - repository: ci-common-templates
-      type: git
-      name: ci-templates
-      ref: 'refs/heads/main'
-
 trigger:
   branches:
     include:
@@ -27,63 +20,37 @@ pool:
 
 stages:
 
-# ======== PRE-BUILD: Извлечение версии ========
-- stage: PreBuild
-  displayName: 'Pre-Build'
-  jobs:
-    - template: templates/stages/build-n-test/v1.yaml@ci-common-templates
-      parameters:
-        serviceName: $(ServiceName)
-        versionScriptPath: "$(Build.SourcesDirectory)/users-api/get_latest_version.py"
-        artifactName: "build-artifact"
-        vmPool: 'Azure Pipelines'
-        vmImage: 'ubuntu-latest'
+# ======== PRE-BUILD ========
+- template: templates/stages/dotnet/build-n-test/v1.yaml@ci-common-templates
+  parameters:
+    ServiceName: $(ServiceName)
+    versionScriptPath: "$(Build.SourcesDirectory)/users-api/get_latest_version.py"
+    artifactName: "build-artifact"
+    vmPool: 'Azure Pipelines'
+    vmImage: 'ubuntu-latest'
 
-# ======== СБОРКА И ТЕСТЫ ========
-- stage: BuildAndTest
-  displayName: 'Сборка и тестирование'
-  dependsOn: PreBuild
-  condition: succeeded()
-  jobs:
-    - template: templates/stages/build-n-test/v2.yaml@ci-common-templates
-      parameters:
-        appVersion: "$(APP_VERSION)"
-        artifactName: "build-artifact"
-        buildSettings:
-          someSetting: 'value'
+# ======== BUILD & TEST ========
+- template: templates/stages/dotnet/build-n-test/v2.yaml@ci-common-templates
+  parameters:
+    appVersion: "$(appVersion)"
+    artifactName: "build-artifact"
+    buildSettings:
+      someSetting: "value"
 
-# ======== СБОРКА И PUSH DOCKER ========
-- stage: DockerBuildAndPush
-  displayName: 'Docker Build & Push'
-  dependsOn: BuildAndTest
-  condition: succeeded()
-  jobs:
-    - template: templates/stages/docker/dockerBuildAndPush.yaml@ci-common-templates
-      parameters:
-        serviceName: $(ServiceName)
-        dockerfilePath: "$(Build.SourcesDirectory)/users-api/Dockerfile"
-        buildContext: "$(Build.SourcesDirectory)/users-api"
-        dockerRegistry: 'sillerolena'
-        repository: 'sillerolena/lab4'
-        tags: "$(APP_VERSION)"
-
-# ======== HELM CHART ========
-- stage: HelmChartPack
-  displayName: 'Helm Chart: Упаковка и Push'
-  dependsOn: DockerBuildAndPush
-  condition: succeeded()
-  jobs:
-    - job: PackAndPush
-      displayName: 'Упаковка и публикация Helm Chart'
-      steps:
-        - script: |
-            echo "Packing and pushing Helm chart..."
-          displayName: 'Helm Chart Step'
+# ======== DOCKER BUILD & PUSH ========
+- template: templates/stages/docker/build-n-push/v1.yaml@ci-common-templates
+  parameters:
+    serviceName: $(ServiceName)
+    dockerfilePath: "$(Build.SourcesDirectory)/users-api/Dockerfile"
+    buildContext: "$(Build.SourcesDirectory)/users-api"
+    dockerRegistry: "sillerolena"
+    repository: "sillerolena/lab4"
+    tags: "$(appVersion)"
 
 # ======== POST-BUILD ========
 - stage: PostBuild
   displayName: 'Post-Build'
-  dependsOn: HelmChartPack
+  dependsOn: []
   condition: succeeded()
   jobs:
     - job: PostBuild
@@ -92,3 +59,4 @@ stages:
         - script: |
             echo "Post-build cleanup or report step"
           displayName: 'Post-Build Step'
+
