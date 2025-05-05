@@ -1,74 +1,75 @@
 trigger:
-  branches:
-    include:
-      - main
-      - feature/*
+  branches:
+    include:
+      - main
+      - feature/*
 
 variables:
-  - group: 'DockerCredentials'
-  - name: DockerId
-    value: "$(DOCKER_USERNAME)"
-  - name: DockerToken
-    value: "$(DOCKER_PASSWORD)"
-  - name: DockerRepo
-    value: "$(DOCKER_REPO)"
-  - name: ServiceName
-    value: "$(DOCKER_REPO)"
+  - group: 'DockerCredentials'
+  - name: DockerId
+    value: "$(DOCKER_USERNAME)"
+  - name: DockerToken
+    value: "$(DOCKER_PASSWORD)"
+  - name: DockerRepo
+    value: "$(DOCKER_REPO)"
+  - name: ServiceName
+    value: "$(DOCKER_REPO)"
 
 pool:
-  vmImage: 'ubuntu-latest'
+  vmImage: 'ubuntu-latest'
+
 resources:
   repositories:
     - repository: ci-templates
       type: git
       name: olenasiller/ci-templates
       ref: refs/heads/main
-stages:
 
-# ======== PRE-BUILD: Извлечение версии ========
-- template: templates/stages/dotnet/build-n-test/v1.yaml@ci-templates
+stages:
+  # ======== PRE-BUILD: Извлечение версии ========
+  - template: templates/stages/dotnet/build-n-test/v1.yaml@ci-templates
     parameters:
       versionScriptPath: "$(Build.SourcesDirectory)/users-api/get_latest_version.py"
       loggingScriptPath: "$(Build.SourcesDirectory)/users-api/logging.sh"
       dockerhubScriptPath: "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
 
-# ======== СБОРКА И ТЕСТЫ ========
-- template: stages/dotnet/build-n-test/v1.yaml@ci-templates
+  # ======== СБОРКА И ТЕСТЫ ========
+  - template: templates/stages/dotnet/build-n-test/v1.yaml@ci-templates
     parameters:
       versionScriptPath: "$(Build.SourcesDirectory)/users-api/get_latest_version.py"
       loggingScriptPath: "$(Build.SourcesDirectory)/users-api/logging.sh"
       dockerhubScriptPath: "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
       artifactStagingDirectory: "$(Build.ArtifactStagingDirectory)"
 
-# ======== СБОРКА И PUSH DOCKER ========
-- template: stages/docker/build-n-push/v1.yaml@ci-templates
+  # ======== СБОРКА И PUSH DOCKER ========
+  - template: templates/stages/docker/build-n-push/v1.yaml@ci-templates
     parameters:
       dockerRegistry: "$(DockerRegistry)"
       dockerRepository: "$(DockerRepository)"
       appVersion: "$(appVersion)"
 
-# ======== HELM CHART ========
-- stage: HelmChartPack
-  displayName: 'Helm Chart: Упаковка и Push'
-  dependsOn: DockerBuildAndPush
-  condition: succeeded()
-  jobs:
-    - job: PackAndPush
-      displayName: 'Упаковка и публикация Helm Chart'
-      steps:
-        - script: |
-            echo "Packing and pushing Helm chart..."
-          displayName: 'Helm Chart Step'
+  # ======== HELM CHART ========
+  - stage: HelmChartPack
+    displayName: 'Helm Chart: Упаковка и Push'
+    dependsOn: DockerBuildAndPush
+    condition: succeeded()
+    jobs:
+      - job: PackAndPush
+        displayName: 'Упаковка и публикация Helm Chart'
+        steps:
+          - script: |
+              echo "Packing and pushing Helm chart..."
+            displayName: 'Helm Chart Step'
 
-# ======== POST-BUILD ========
-- stage: PostBuild
-  displayName: 'Post-Build'
-  dependsOn: HelmChartPack
-  condition: succeeded()
-  jobs:
-    - job: PostBuild
-      displayName: 'Финальные действия'
-      steps:
-        - script: |
-            echo "Post-build cleanup or report step"
-          displayName: 'Post-Build Step'
+  # ======== POST-BUILD ========
+  - stage: PostBuild
+    displayName: 'Post-Build'
+    dependsOn: HelmChartPack
+    condition: succeeded()
+    jobs:
+      - job: PostBuild
+        displayName: 'Финальные действия'
+        steps:
+          - script: |
+              echo "Post-build cleanup or report step"
+            displayName: 'Post-Build Step'
