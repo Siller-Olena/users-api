@@ -3,6 +3,12 @@ trigger:
     include:
       - main
       - feature/*
+resources:
+  repositories:
+    - repository: ci-templates
+      type: git
+      name: olenasiller/ci-templates
+      ref: refs/heads/main      
 
 variables:
   - name: DockerRepo
