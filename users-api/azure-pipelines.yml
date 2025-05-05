@@ -36,6 +36,9 @@ stages:
   - template: stages/dotnet/build-n-test/v1.yaml@ci-templates
     parameters:
       artifactStagingDirectory: "$(Build.ArtifactStagingDirectory)"
+      versionScriptPath: "$(Build.SourcesDirectory)/users-api/get_latest_version.py"
+      loggingScriptPath: "$(Build.SourcesDirectory)/users-api/logging.sh"
+      dockerhubScriptPath: "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
 
   # Docker Build & Push Stage
   - template: stages/docker/build-n-push/v1.yaml@ci-templates
