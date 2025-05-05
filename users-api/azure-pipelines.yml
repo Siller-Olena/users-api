@@ -1,50 +1,51 @@
 trigger:
-  branches:
-    include:
-      - main
-      - feature/*
+  branches:
+    include:
+      - main
+      - feature/*
 
 variables:
-  - name: DockerRepo
-    value: "$(DOCKER_REPO)"
-  - name: DockerRegistry
-    value: "your_docker_registry"
-  - name: DockerRepository
-    value: "your_docker_repository"
-  - name: appVersion
-    value: "$(Build.BuildId)"
+  - group: 'DockerCredentials'
+  - name: DockerId
+    value: "$(DOCKER_USERNAME)"
+  - name: DockerToken
+    value: "$(DOCKER_PASSWORD)"
+  - name: DockerRepo
+    value: "$(DOCKER_REPO)"
+  - name: ServiceName
+    value: "$(DOCKER_REPO)"
 
 pool:
-  vmImage: 'ubuntu-latest'
-
+  vmImage: 'ubuntu-latest'
 resources:
   repositories:
     - repository: ci-templates
       type: git
       name: olenasiller/ci-templates
       ref: refs/heads/main
-
 stages:
-  - template: stages/dotnet/build-n-test/v1.yaml@ci-templates
+
+# ======== PRE-BUILD: Извлечение версии ========
+- template: templates/stages/dotnet/build-n-test/v1.yaml@ci-templates
     parameters:
       versionScriptPath: "$(Build.SourcesDirectory)/users-api/get_latest_version.py"
       loggingScriptPath: "$(Build.SourcesDirectory)/users-api/logging.sh"
       dockerhubScriptPath: "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
 
-  - template: stages/dotnet/build-n-test/v1.yaml@ci-templates
+# ======== СБОРКА И ТЕСТЫ ========
+- template: stages/dotnet/build-n-test/v1.yaml@ci-templates
     parameters:
+      versionScriptPath: "$(Build.SourcesDirectory)/users-api/get_latest_version.py"
+      loggingScriptPath: "$(Build.SourcesDirectory)/users-api/logging.sh"
+      dockerhubScriptPath: "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
       artifactStagingDirectory: "$(Build.ArtifactStagingDirectory)"
-      versionScriptPath: "$(Build.SourcesDirectory)/users-api/get_latest_version.py"
-      loggingScriptPath: "$(Build.SourcesDirectory)/users-api/logging.sh"
-      dockerhubScriptPath: "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
 
-  - template: stages/docker/build-n-push/v1.yaml@ci-templates
+# ======== СБОРКА И PUSH DOCKER ========
+- template: stages/docker/build-n-push/v1.yaml@ci-templates
     parameters:
       dockerRegistry: "$(DockerRegistry)"
       dockerRepository: "$(DockerRepository)"
       appVersion: "$(appVersion)"
-
-
 
 # ======== HELM CHART ========
 - stage: HelmChartPack
@@ -71,4 +72,3 @@ stages:
         - script: |
             echo "Post-build cleanup or report step"
           displayName: 'Post-Build Step'
-
