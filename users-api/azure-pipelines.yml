@@ -3,7 +3,12 @@ trigger:
     include:
       - main
       - feature/*
-
+resources: 
+   repositories: 
+     - repository: ci-common-templates
+       type: git
+       ref: 'refs/heads/main'
+       name: ci-templates
 variables:
   - group: 'DockerCredentials'
   - name: DockerId
