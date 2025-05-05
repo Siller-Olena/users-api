@@ -3,7 +3,6 @@ trigger:
     include:
       - main
       - feature/*
-    
 
 variables:
   - name: DockerRepo
@@ -26,15 +25,15 @@ resources:
       ref: refs/heads/main
 
 stages:
-  - template: ci-templates/stages/PreBuildTemplate.yml
+  - template: stages/PreBuildTemplate.yml@ci-templates
     parameters:
-      versionScriptPath: "$(Build.SourcesDirectory)/path/to/your/version/script"
+      versionScriptPath: "$(Build.SourcesDirectory)/users-api/get_latest_version.py"
 
-  - template: ci-templates/stages/BuildAndTestTemplate.yml
+  - template: stages/BuildAndTestTemplate.yml@ci-templates
     parameters:
       artifactStagingDirectory: "$(Build.ArtifactStagingDirectory)"
 
-  - template: ci-templates/stages/DockerBuildAndPushTemplate.yml
+  - template: stages/DockerBuildAndPushTemplate.yml@ci-templates
     parameters:
       dockerRegistry: "$(DockerRegistry)"
       dockerRepository: "$(DockerRepository)"
