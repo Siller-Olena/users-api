@@ -43,14 +43,18 @@ stages:
       someSetting: "value"
 
 # ======== DOCKER BUILD & PUSH ========
-- template: templates/stages/docker/build-n-push/v1.yaml@ci-templates
+- template: /templates/stages/docker/build-n-push/v1.yaml@ci-templates
   parameters:
-    serviceName: $(ServiceName)
-    dockerfilePath: "$(Build.SourcesDirectory)/users-api/Dockerfile"
-    buildContext: "$(Build.SourcesDirectory)/users-api"
-    dockerRegistry: "sillerolena"
-    repository: "sillerolena/lab4"
-    tags: "$(appVersion)"
+    dockerSettings:
+      serviceName: 'users-api'
+      dockerfilePath: 'Dockerfile'
+      buildContext: '.'
+      dockerRegistry: 'myacr.azurecr.io'
+      repository: 'myacr.azurecr.io/users-api'
+      imageTag: '$(Build.BuildId)'
+      registryServiceConnection: 'my-acr-service-connection'
+    vmImage: 'ubuntu-latest'
+
 
 # ======== POST-BUILD ========
 - stage: PostBuild
