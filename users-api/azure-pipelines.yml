@@ -3,69 +3,38 @@ trigger:
     include:
       - main
       - feature/*
-resources: 
-   repositories: 
-     - repository: ci-templates
-       type: git
-       ref: 'refs/heads/main'
-       name: ci-templates
+
 variables:
-  - group: 'DockerCredentials'
-  - name: DockerId
-    value: "$(DOCKER_USERNAME)"
-  - name: DockerToken
-    value: "$(DOCKER_PASSWORD)"
   - name: DockerRepo
     value: "$(DOCKER_REPO)"
-  - name: ServiceName
-    value: "$(DOCKER_REPO)"
+  - name: DockerRegistry
+    value: "your_docker_registry"
+  - name: DockerRepository
+    value: "your_docker_repository"
+  - name: appVersion
+    value: "$(Build.BuildId)"
 
 pool:
   vmImage: 'ubuntu-latest'
 
+resources:
+  repositories:
+    - repository: ci-templates
+      type: git
+      name: ci-templates   # назва репозиторію з шаблонами
+      ref: refs/heads/main
+
 stages:
+  - template: ci-templates/stages/PreBuildTemplate.yml
+    parameters:
+      versionScriptPath: "$(Build.SourcesDirectory)/path/to/your/version/script"
 
-# ======== PRE-BUILD ========
-- template: templates/stages/dotnet/build-n-test/v1.yaml@ci-templates
-  parameters:
-    ServiceName: $(ServiceName)
-    versionScriptPath: "$(Build.SourcesDirectory)/users-api/get_latest_version.py"
-    artifactName: "build-artifact"
-    vmPool: 'Azure Pipelines'
-    vmImage: 'ubuntu-latest'
+  - template: ci-templates/stages/BuildAndTestTemplate.yml
+    parameters:
+      artifactStagingDirectory: "$(Build.ArtifactStagingDirectory)"
 
-# ======== BUILD & TEST ========
-- template: templates/stages/dotnet/build-n-test/v2.yaml@ci-templates
-  parameters:
-    appVersion: "$(appVersion)"
-    artifactName: "build-artifact"
-    buildSettings:
-      someSetting: "value"
-
-# ======== DOCKER BUILD & PUSH ========
-- template: /templates/stages/docker/build-n-push/v1.yaml@ci-templates
-  parameters:
-    dockerSettings:
-      serviceName: 'users-api'
-      dockerfilePath: 'Dockerfile'
-      buildContext: '.'
-      dockerRegistry: 'myacr.azurecr.io'
-      repository: 'myacr.azurecr.io/users-api'
-      imageTag: '$(Build.BuildId)'
-      registryServiceConnection: 'my-acr-service-connection'
-    vmImage: 'ubuntu-latest'
-
-
-# ======== POST-BUILD ========
-- stage: PostBuild
-  displayName: 'Post-Build'
-  dependsOn: []
-  condition: succeeded()
-  jobs:
-    - job: PostBuild
-      displayName: 'Финальные действия'
-      steps:
-        - script: |
-            echo "Post-build cleanup or report step"
-          displayName: 'Post-Build Step'
-
+  - template: ci-templates/stages/DockerBuildAndPushTemplate.yml
+    parameters:
+      dockerRegistry: "$(DockerRegistry)"
+      dockerRepository: "$(DockerRepository)"
+      appVersion: "$(appVersion)"
