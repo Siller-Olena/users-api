@@ -5,7 +5,7 @@ trigger:
       - feature/*
 resources: 
    repositories: 
-     - repository: ci-common-templates
+     - repository: ci-templates
        type: git
        ref: 'refs/heads/main'
        name: ci-templates
@@ -26,7 +26,7 @@ pool:
 stages:
 
 # ======== PRE-BUILD ========
-- template: templates/stages/dotnet/build-n-test/v1.yaml@ci-common-templates
+- template: templates/stages/dotnet/build-n-test/v1.yaml@ci-templates
   parameters:
     ServiceName: $(ServiceName)
     versionScriptPath: "$(Build.SourcesDirectory)/users-api/get_latest_version.py"
@@ -35,7 +35,7 @@ stages:
     vmImage: 'ubuntu-latest'
 
 # ======== BUILD & TEST ========
-- template: templates/stages/dotnet/build-n-test/v2.yaml@ci-common-templates
+- template: templates/stages/dotnet/build-n-test/v2.yaml@ci-templates
   parameters:
     appVersion: "$(appVersion)"
     artifactName: "build-artifact"
@@ -43,7 +43,7 @@ stages:
       someSetting: "value"
 
 # ======== DOCKER BUILD & PUSH ========
-- template: templates/stages/docker/build-n-push/v1.yaml@ci-common-templates
+- template: templates/stages/docker/build-n-push/v1.yaml@ci-templates
   parameters:
     serviceName: $(ServiceName)
     dockerfilePath: "$(Build.SourcesDirectory)/users-api/Dockerfile"
