@@ -41,12 +41,11 @@ stages:
 
   # ======== СБОРКА И PUSH DOCKER ========
   - template: templates/stages/docker/build-n-push/v1.yaml@ci-templates
-    parameters:
-      ciTemplates: 'ci-templates'
-      dockerSettings:
-        dockerRegistry: "$(DockerId)"
-        dockerRepository: "$(DockerRepository)"
-        appVersion: "$(appVersion)"
+  parameters:
+    dockerSettings:
+      dockerRegistry: "$(DockerRegistry)"
+      dockerRepository: "$(DockerRepository)"
+      appVersion: "$(appVersion)"
 
   # ======== HELM CHART ========
   - stage: HelmChartPack
