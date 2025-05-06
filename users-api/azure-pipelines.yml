@@ -8,10 +8,11 @@ variables:
   - group: 'DockerCredentials'
   - name: appVersion
     value: $[ stageDependencies.PreBuild.SetVersionJob.outputs['setAppVersionStep.APP_VERSION'] ]
+  - name: DockerId
     value: "$(DOCKER_USERNAME)"
   - name: DockerToken
     value: "$(DOCKER_PASSWORD)"
-  - name: DockerRepo
+  - name: DockerRepository
     value: "$(DOCKER_REPO)"
   - name: ServiceName
     value: "$(DOCKER_REPO)"
@@ -45,10 +46,10 @@ stages:
   # ======== СБОРКА И PUSH DOCKER ========
   - template: templates/stages/docker/build-n-push/v1.yaml@ci-templates
     parameters:
-    dockerSettings:
-      dockerRegistry: "$(DockerRegistry)"
-      dockerRepository: "$(DockerRepository)"
-      appVersion: "$(appVersion)"
+      dockerSettings:
+        dockerRegistry: "$(DockerId)"
+        dockerRepository: "$(DockerRepository)"
+        appVersion: "$(appVersion)"
 
   # ======== HELM CHART ========
   - stage: HelmChartPack
@@ -62,7 +63,6 @@ stages:
           - script: |
               echo "Packing and pushing Helm chart..."
             displayName: 'Helm Chart Step'
-
 
   # ======== POST-BUILD ========
   - stage: PostBuild
