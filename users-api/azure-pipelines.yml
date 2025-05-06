@@ -6,8 +6,6 @@ trigger:
 
 variables:
   - group: 'DockerCredentials'
-  - name: appVersion
-    value: $[ stageDependencies.PreBuild.SetVersionJob.outputs['setAppVersionStep.APP_VERSION'] ]
   - name: DockerId
     value: "$(DOCKER_USERNAME)"
   - name: DockerToken
@@ -28,24 +26,23 @@ resources:
       ref: refs/heads/main
 
 stages:
-  # ======== PRE-BUILD: Извлечение версии ========
+  # ======== PRE-BUILD ========
   - template: templates/stages/dotnet/build-n-test/v1.yaml@ci-templates
     parameters:
-      versionScriptPath: "$(Build.SourcesDirectory)/users-api/get_latest_version.py"
-      loggingScriptPath: "$(Build.SourcesDirectory)/users-api/logging.sh"
-      dockerhubScriptPath: "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
+      ciTemplates: 'ci-templates'
 
   # ======== СБОРКА И ТЕСТЫ ========
   - template: templates/stages/dotnet/build-n-test/v2.yaml@ci-templates
     parameters:
-      versionScriptPath: "$(Build.SourcesDirectory)/users-api/get_latest_version.py"
-      loggingScriptPath: "$(Build.SourcesDirectory)/users-api/logging.sh"
-      dockerhubScriptPath: "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
-      artifactStagingDirectory: "$(Build.ArtifactStagingDirectory)"
+      ciTemplates: 'ci-templates'
+      appVersion: "$(appVersion)"
+      artifactName: "build-artifact"
+      buildSettings: {} # добавь реальные опции, если есть
 
   # ======== СБОРКА И PUSH DOCKER ========
   - template: templates/stages/docker/build-n-push/v1.yaml@ci-templates
     parameters:
+      ciTemplates: 'ci-templates'
       dockerSettings:
         dockerRegistry: "$(DockerId)"
         dockerRepository: "$(DockerRepository)"
