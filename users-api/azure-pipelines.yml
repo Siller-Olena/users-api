@@ -1,8 +1,6 @@
 parameters:
   - name: ciTemplates  # Назва параметра
     type: string        # Тип параметра
-    default: 'templates/stages/dotnet/build-n-test/v1.yaml'  # Значення за замовчуванням (шлях до шаблону)
-
   - name: appVersion    # Інший параметр
     type: string
     default: ''
