@@ -29,10 +29,11 @@ stages:
   # ======== PRE-BUILD: Извлечение версии ========
   - template: templates/stages/dotnet/build-n-test/v1.yaml@ci-templates
     parameters:
+    ciTemplates: ci-templates
       versionScriptPath: "$(Build.SourcesDirectory)/users-api/get_latest_version.py"
       loggingScriptPath: "$(Build.SourcesDirectory)/users-api/logging.sh"
       dockerhubScriptPath: "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
-
+      artifactStagingDirectory: "$(Build.ArtifactStagingDirectory)"
   # ======== СБОРКА И ТЕСТЫ ========
   - template: templates/stages/dotnet/build-n-test/v2.yaml@ci-templates
     parameters:
