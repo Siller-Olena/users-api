@@ -1,3 +1,15 @@
+parameters:
+  - name: ciTemplates  # Назва параметра
+    type: string        # Тип параметра
+    default: 'templates/stages/dotnet/build-n-test/v1.yaml'  # Значення за замовчуванням (шлях до шаблону)
+
+  - name: appVersion    # Інший параметр
+    type: string
+    default: ''
+
+  - name: DockerRepo    # Параметр для Docker-репозиторію
+    type: string
+    default: 'myDockerRepo'
 trigger:
   branches:
     include:
@@ -29,7 +41,6 @@ stages:
   # ======== PRE-BUILD: Извлечение версии ========
   - template: templates/stages/dotnet/build-n-test/v1.yaml@ci-templates
     parameters:
-    ciTemplates: ci-templates
       versionScriptPath: "$(Build.SourcesDirectory)/users-api/get_latest_version.py"
       loggingScriptPath: "$(Build.SourcesDirectory)/users-api/logging.sh"
       dockerhubScriptPath: "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
