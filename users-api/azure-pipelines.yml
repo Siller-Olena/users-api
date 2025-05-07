@@ -1,13 +1,4 @@
-parameters:
-  - name: ciTemplates  # Назва параметра
-    type: string        # Тип параметра
-  - name: appVersion    # Інший параметр
-    type: string
-    default: ''
 
-  - name: DockerRepo    # Параметр для Docker-репозиторію
-    type: string
-    default: 'myDockerRepo'
 trigger:
   branches:
     include:
