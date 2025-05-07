@@ -4,7 +4,6 @@ trigger:
     include:
       - main
       - feature/*
-
 variables:
   - group: 'DockerCredentials'
   - name: appVersion
