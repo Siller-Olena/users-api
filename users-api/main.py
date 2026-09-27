@@ -12,4 +12,4 @@ app.add_middleware(ErrorHandlerMiddleware)
 error_handler.setup_exception_handlers(app)
 
 # Додаємо маршрути
-app.include_router(router, prefix="/users", tags=["Users"])
+app.include_router(router, tags=["Users"])

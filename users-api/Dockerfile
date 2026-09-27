@@ -1,30 +1,22 @@
-# Basis-Image mit Python 3.11
+
+# Базовий образ з Python 3.11
 FROM python:3.11
 
-# Setze das Arbeitsverzeichnis
+# Робоча директорія
 WORKDIR /app
 
-# Kopiere die Abhängigkeitsdateien und installiere sie
+# Копіюємо файл залежностей і встановлюємо їх
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Kopiere den gesamten Code ins Container-Image
+# Копіюємо весь код у контейнер
 COPY . /app
 
-# Install dependencies
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Install Alembic
-RUN pip install alembic
-
-# Setze Umgebungsvariablen für FastAPI
+# Змінна середовища для FastAPI/Python
 ENV PYTHONUNBUFFERED=1
 
-# Führe Alembic-Migrationen aus
-#RUN alembic upgrade head
+# Відкриваємо порт, на якому реально працює застосунок
+EXPOSE 8000
 
-# Expose port 5000 for the Flask app
-EXPOSE 5000
-
-# Run alembic upgrade when the container starts
-CMD ["sh", "-c", "uvicorn src.main:app --host=0.0.0.0 --port=8000"]
+# Запускаємо застосунок при старті контейнера
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
