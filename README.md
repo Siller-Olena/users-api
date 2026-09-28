@@ -1,21 +1,23 @@
-# Introduction 
-This service provides an ability to manage users in the system
-TODO: Give a short introduction of your project. Let this section explain the objectives or the motivation behind this project. 
+# Users API
 
-# Getting Started
-TODO: Guide users through getting your code up and running on their own system. In this section you can talk about:
-1.	Installation process
-2.	Software dependencies
-3.	Latest releases
-4.	API references
+REST API для керування користувачами в системі (CRUD: створення, отримання, оновлення, видалення).
 
-# Build and Test
-TODO: Describe and show how to build your code and run the tests. 
+## Мова та фреймворк
+- Python 3.11
+- FastAPI (документація OpenAPI та Swagger UI доступні за адресою `/docs`)
+- Pytest для unit-тестів
 
-# Contribute
-TODO: Explain how other users and developers can contribute to make your code better. 
+## Збірка та запуск Docker image
+```bash
+cd users-api
+docker build -t users-api:latest .
+docker run -p 8000:8000 users-api:latest
+```
+Після запуску Swagger UI доступний за адресою http://localhost:8000/docs
 
-If you want to learn more about creating good readme files then refer the following [guidelines](https://docs.microsoft.com/en-us/azure/devops/repos/git/create-a-readme?view=azure-devops). You can also seek inspiration from the below readme files:
-- [ASP.NET Core](https://github.com/aspnet/Home)
-- [Visual Studio Code](https://github.com/Microsoft/vscode)
-- [Chakra Core](https://github.com/Microsoft/ChakraCore)
+## Запуск тестів
+```bash
+cd users-api
+pip install -r requirements.txt
+pytest -v
+```
