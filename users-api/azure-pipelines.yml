@@ -3,75 +3,69 @@ trigger:
   branches:
     include:
       - main
-      - feature/*
-variables:
-  - group: 'DockerCredentials'
-  - name: appVersion
-    value: $[ stageDependencies.PreBuild.SetVersionJob.outputs['setAppVersionStep.APP_VERSION'] ]
-  - name: DockerToken
-    value: "$(DOCKER_PASSWORD)"
-  - name: DockerRepo
-    value: "$(DOCKER_REPO)"
-  - name: ServiceName
-    value: "$(DOCKER_REPO)"
 
 pool:
   vmImage: 'ubuntu-latest'
 
-resources:
-  repositories:
-    - repository: ci-templates
-      type: git
-      name: olenasiller/ci-templates
-      ref: refs/heads/main
+variables:
+  dockerRegistryServiceConnection: 'sillerolena'
+  imageRepository: 'sillerolena/sillerolena1'
+  dockerfilePath: 'users-api/Dockerfile'
+  buildContext: 'users-api'
+  tag: 'latest'
 
 stages:
-  # ======== PRE-BUILD: Извлечение версии ========
-  - template: templates/stages/dotnet/build-n-test/v1.yaml@ci-templates
-    parameters:
-      versionScriptPath: "$(Build.SourcesDirectory)/users-api/get_latest_version.py"
-      loggingScriptPath: "$(Build.SourcesDirectory)/users-api/logging.sh"
-      dockerhubScriptPath: "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
-      artifactStagingDirectory: "$(Build.ArtifactStagingDirectory)"
-  # ======== СБОРКА И ТЕСТЫ ========
-  - template: templates/stages/dotnet/build-n-test/v2.yaml@ci-templates
-    parameters:
-      versionScriptPath: "$(Build.SourcesDirectory)/users-api/get_latest_version.py"
-      loggingScriptPath: "$(Build.SourcesDirectory)/users-api/logging.sh"
-      dockerhubScriptPath: "$(Build.SourcesDirectory)/users-api/common-script/dockerhub.sh"
-      artifactStagingDirectory: "$(Build.ArtifactStagingDirectory)"
+  - stage: BuildAndTest
+    displayName: 'Build and unit tests'
+    jobs:
+      - job: Test
+        steps:
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '3.11'
+            displayName: 'Set up Python'
 
-  # ======== СБОРКА И PUSH DOCKER ========
-  - template: templates/stages/docker/build-n-push/v1.yaml@ci-templates
-    parameters:
-      dockerSettings:
-        dockerRegistry: "$(DockerRegistry)"
-        dockerRepository: "$(DockerRepository)"
-        appVersion: "$(appVersion)"
+          - script: |
+              python -m pip install --upgrade pip
+              pip install -r users-api/requirements.txt
+            displayName: 'Build: install dependencies'
 
-  # ======== HELM CHART ========
-  - stage: HelmChartPack
-    displayName: 'Helm Chart: Упаковка и Push'
-    dependsOn: DockerBuildAndPush
+          - script: |
+              cd users-api
+              pytest -v --junitxml=test-results.xml
+            displayName: 'Run unit tests'
+
+          - task: PublishTestResults@2
+            condition: succeededOrFailed()
+            inputs:
+              testResultsFiles: 'users-api/test-results.xml'
+              testRunTitle: 'Unit tests'
+
+  - stage: DockerPublish
+    displayName: 'Docker build, tag and push'
+    dependsOn: BuildAndTest
     condition: succeeded()
     jobs:
-      - job: PackAndPush
-        displayName: 'Упаковка и публикация Helm Chart'
+      - job: Docker
         steps:
-          - script: |
-              echo "Packing and pushing Helm chart..."
-            displayName: 'Helm Chart Step'
+          - task: Docker@2
+            displayName: 'Build Docker image'
+            inputs:
+              command: build
+              containerRegistry: $(dockerRegistryServiceConnection)
+              repository: $(imageRepository)
+              dockerfile: $(dockerfilePath)
+              buildContext: $(buildContext)
+              tags: |
+                $(tag)
+                $(Build.BuildId)
 
-
-  # ======== POST-BUILD ========
-  - stage: PostBuild
-    displayName: 'Post-Build'
-    dependsOn: HelmChartPack
-    condition: succeeded()
-    jobs:
-      - job: PostBuild
-        displayName: 'Финальные действия'
-        steps:
-          - script: |
-              echo "Post-build cleanup or report step"
-            displayName: 'Post-Build Step'
+          - task: Docker@2
+            displayName: 'Push image to Docker Hub'
+            inputs:
+              command: push
+              containerRegistry: $(dockerRegistryServiceConnection)
+              repository: $(imageRepository)
+              tags: |
+                $(tag)
+                $(Build.BuildId)
