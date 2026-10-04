@@ -41,3 +41,15 @@ jobs:
       - name: Run unit tests
         working-directory: users-api
         run: pytest -v
+
+  docker-pack-n-push:
+    name: docker-pack-n-push
+    needs: build-n-test
+    uses: ./.github/workflows/docker-pack-n-push.yml
+    with:
+      image-name: sillerolenasillerolena2/sillerolena1
+      image-tag: latest
+      push-to-registry: ${{ github.ref == 'refs/heads/main' }}
+    secrets:
+      docker-username: ${{ secrets.DOCKERHUB_USERNAME }}
+      docker-password: ${{ secrets.DOCKERHUB_TOKEN }}
