@@ -13,3 +13,6 @@ error_handler.setup_exception_handlers(app)
 
 # Додаємо маршрути
 app.include_router(router, tags=["Users"])
+
+
+# test docker workflow
