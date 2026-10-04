@@ -20,4 +20,7 @@ docker run -p 8000:8000 users-api:latest
 cd users-api
 pip install -r requirements.txt
 pytest -v
+## Посилання
+- GitHub: https://github.com/Siller-Olena/users-api
+- Docker Hub: https://hub.docker.com/r/sillerolena/sillerolena1
 ```
