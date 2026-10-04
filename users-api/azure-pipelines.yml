@@ -17,8 +17,11 @@ variables:
 stages:
   - stage: BuildAndTest
     displayName: 'Build and unit tests'
+
     jobs:
       - job: Test
+        displayName: 'Run Python tests'
+
         steps:
           - task: UsePythonVersion@0
             inputs:
@@ -26,13 +29,15 @@ stages:
             displayName: 'Set up Python'
 
           - script: |
+              python --version
               python -m pip install --upgrade pip
-              pip install -r users-api/requirements.txt
-            displayName: 'Build: install dependencies'
+              python -m pip install -r users-api/requirements.txt
+              python -m pip install pytest
+            displayName: 'Install dependencies'
 
           - script: |
               cd users-api
-              pytest -v --junitxml=test-results.xml
+              python -m pytest -v --junitxml=test-results.xml
             displayName: 'Run unit tests'
 
           - task: PublishTestResults@2
@@ -45,8 +50,11 @@ stages:
     displayName: 'Docker build, tag and push'
     dependsOn: BuildAndTest
     condition: succeeded()
+
     jobs:
       - job: Docker
+        displayName: 'Build and push Docker image'
+
         steps:
           - task: Docker@2
             displayName: 'Build Docker image'
@@ -69,3 +77,4 @@ stages:
               tags: |
                 $(tag)
                 $(Build.BuildId)
+
